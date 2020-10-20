@@ -1,0 +1,17 @@
+[run]
+branch = True
+parallel = True
+source = ntnx_api
+
+[paths]
+source=
+   ntnx_api
+   docs
+
+[report]
+fail_under = 100
+precision = 2
+ignore_errors = True
+include =
+   ntnx_api
+   docs

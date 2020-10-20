@@ -1,0 +1,176 @@
+# This file is a template, and might need editing before it works on your project.
+# Official language image. Look for the different tagged releases at:
+# https://hub.docker.com/r/library/python/tags/
+image: python:3
+
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+# Pip's cache doesn't store the python packages
+# https://pip.pypa.io/en/stable/reference/pip_install/#caching
+#
+# If you want to also cache the installed packages, you have to install
+# them in a virtualenv and cache it as well.
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .cache/pip
+    - venv/
+    - .tox
+
+default:
+  before_script:
+  - python -V  # Print out python version for debugging
+  - python -m pip install --upgrade --no-cache-dir pip setuptools wheel
+  - pip install virtualenv tox
+  - virtualenv venv
+  - source venv/bin/activate
+
+stages:
+  - quality
+  - test
+  - build
+  - upload
+
+flake8:
+  stage: quality
+  script:
+    - tox -e flake8
+  only:
+    refs:
+      - branches
+  tags:
+    - linux
+
+pytest:
+  stage: test
+  script:
+    - tox -e py3
+  only:
+    refs:
+      - branches
+  tags:
+    - nutanix_cluster
+
+source:
+  stage: build
+  only:
+    refs:
+      - branches
+  artifacts:
+    paths:
+      - dist/*.whl
+      - dist/*.tar.gz
+  script:
+    - python3 setup.py check sdist
+    - python setup.py sdist
+  tags:
+    - linux
+
+linux:
+  stage: build
+  only:
+    refs:
+      - branches
+  tags:
+    - linux
+  artifacts:
+    paths:
+      - dist/*.whl
+  script:
+    - python3 setup.py check sdist bdist
+    - python setup.py sdist bdist_wheel
+
+#windows:
+#  before_script:
+#    - choco upgrade all -y
+#    - choco install python3 -y --params "/InstallDir:C:\Python3"
+#    - refreshenv
+#    - $Env:Path += ";C:\Python3;C:\Python3\Scripts"
+#    - C:\Python3\python.exe -m pip install --upgrade --no-cache-dir pip setuptools wheel
+#    - C:\Python3\Scripts\pip.exe install virtualenv tox
+#    - virtualenv venv
+#    - .\venv\Scripts\activate
+#  stage: build
+#  only:
+#    refs:
+#      - branches
+#  tags:
+#    - windows
+#  artifacts:
+#    paths:
+#      - dist/*.whl
+#  script:
+#    - C:\Python3\python.exe setup.py check bdist
+#    - C:\Python3\python.exe setup.py bdist_wheel
+
+docs:
+  stage: build
+  script:
+    - pip install sphinx sphinx-rtd-theme
+    - cd docs ; make html
+    - mv _build/html/ ../public/
+  artifacts:
+    paths:
+      - public
+  only:
+    refs:
+      - branches
+  tags:
+    - linux
+
+pypi-gitlab:
+  stage: upload
+  only:
+    - develop
+  artifacts:
+    paths:
+      - dist/*.whl
+      - dist/*.tar.gz
+  variables:
+    TWINE_USERNAME: "gitlab-ci-token"
+    TWINE_PASSWORD: $CI_JOB_TOKEN
+    REGISTRY_URL: https://gitlab.com/api/v4/projects/${CI_PROJECT_ID}/packages/pypi
+  script:
+    - pip install twine
+    - twine upload -u "${TWINE_USERNAME}" -p "${TWINE_PASSWORD}" --verbose --skip-existing --disable-progress-bar --repository-url "${REGISTRY_URL}" dist/*
+  tags:
+    - linux
+
+pypi-test:
+  stage: upload
+  only:
+    - develop
+  artifacts:
+    paths:
+      - dist/*.whl
+      - dist/*.tar.gz
+  variables:
+    TWINE_PASSWORD: $PYPI_PASSWORD
+    TWINE_USERNAME: $PYPI_USERNAME
+    REGISTRY_URL: https://test.pypi.org/legacy/
+  script:
+    - pip install twine
+    - twine upload -u "${TWINE_USERNAME}" -p "${TWINE_PASSWORD}" --verbose --skip-existing --disable-progress-bar --repository-url "${REGISTRY_URL}" dist/*
+  tags:
+    - linux
+
+pypi:
+  stage: upload
+  only:
+    - master
+  artifacts:
+    paths:
+      - dist/*.whl
+      - dist/*.tar.gz
+  variables:
+    TWINE_PASSWORD: $PYPI_PASSWORD
+    TWINE_USERNAME: $PYPI_USERNAME
+    REGISTRY_URL: https://upload.pypi.org/legacy/
+  script:
+    - pip install twine
+    - twine upload -u "${TWINE_USERNAME}" -p "${TWINE_PASSWORD}" --verbose --skip-existing --disable-progress-bar --repository-url "${REGISTRY_URL}" dist/*
+  tags:
+    - linux
