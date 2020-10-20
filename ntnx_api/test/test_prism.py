@@ -168,7 +168,7 @@ def test_update_ntp_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        cluster_set_ntp = config_obj.set_ntp(ntp_servers=test_ntp, clusteruuid=each_uuid)
+        config_obj.set_ntp(ntp_servers=test_ntp, clusteruuid=each_uuid)
         cluster_ntp = config_obj.get_ntp(clusteruuid=each_uuid)
 
         if all(elem in test_ntp for elem in cluster_ntp):
@@ -213,7 +213,7 @@ def test_update_dns_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        cluster_set_dns = config_obj.set_dns(dns_servers=test_dns, clusteruuid=each_uuid)
+        config_obj.set_dns(dns_servers=test_dns, clusteruuid=each_uuid)
         cluster_dns = config_obj.get_dns(clusteruuid=each_uuid)
 
         if all(elem in test_dns for elem in cluster_dns):
@@ -243,8 +243,8 @@ def test_add_proxy_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        cluster_add_proxy = config_obj.set_proxy(address=proxy['address'], port=proxy['port'], name=proxy['name'], http=proxy['http'], https=proxy['https'],
-                                                 username=proxy['username'], password=proxy['password'], socks=proxy['socks'], clusteruuid=each_uuid)
+        config_obj.set_proxy(address=proxy['address'], port=proxy['port'], name=proxy['name'], http=proxy['http'], https=proxy['https'],
+                             username=proxy['username'], password=proxy['password'], socks=proxy['socks'], clusteruuid=each_uuid)
         cluster_proxy = config_obj.get_proxy(clusteruuid=each_uuid)
 
         if proxy['address'] == cluster_proxy[0]['address']:
@@ -272,8 +272,8 @@ def test_update_proxy_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        cluster_add_proxy = config_obj.set_proxy(address=proxy['address'], port=proxy['port'], name=proxy['name'], http=proxy['http'], https=proxy['https'],
-                                                 username=proxy['username'], password=proxy['password'], socks=proxy['socks'], clusteruuid=each_uuid)
+        config_obj.set_proxy(address=proxy['address'], port=proxy['port'], name=proxy['name'], http=proxy['http'], https=proxy['https'],
+                             username=proxy['username'], password=proxy['password'], socks=proxy['socks'], clusteruuid=each_uuid)
         cluster_proxy = config_obj.get_proxy(clusteruuid=each_uuid)
 
         if proxy['address'] == cluster_proxy[0]['address']:
@@ -301,7 +301,7 @@ def test_delete_proxy_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        cluster_delete_proxy = config_obj.remove_proxy(name=proxy['name'], clusteruuid=each_uuid)
+        config_obj.remove_proxy(name=proxy['name'], clusteruuid=each_uuid)
         cluster_proxy = config_obj.get_proxy(clusteruuid=each_uuid)
 
         if not cluster_proxy:
@@ -452,21 +452,19 @@ def test_add_auth_directory_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        config_add_auth_dir = config_obj.set_auth_dir(name=test_domain['name'], directory_type=test_domain['directory_type'],
-                                                      directory_url=test_domain['directory_url'], domain=test_domain['domain'],
-                                                      username=test_domain['username'], password=test_domain['password'], recursive=test_domain['recursive'],
-                                                      connection_type=test_domain['connection_type'], clusteruuid=each_uuid)
+        config_obj.set_auth_dir(name=test_domain['name'], directory_type=test_domain['directory_type'],
+                                directory_url=test_domain['directory_url'], domain=test_domain['domain'],
+                                username=test_domain['username'], password=test_domain['password'], recursive=test_domain['recursive'],
+                                connection_type=test_domain['connection_type'], clusteruuid=each_uuid)
 
         auth_dirs = config_obj.get_auth_dirs(clusteruuid=each_uuid)
-        if any(item for item in auth_dirs if item['name'] == test_domain['name'] and
-                                             item['directory_type'] == test_domain['directory_type'] and
-                                             item['directory_url'] == test_domain['directory_url'] and
-                                             item['domain'] == test_domain['domain'] and
+        if any(item for item in auth_dirs if item['name'] == test_domain['name'] and item['directory_type'] == test_domain['directory_type'] and
+                                             item['directory_url'] == test_domain['directory_url'] and item['domain'] == test_domain['domain'] and
                                              item['service_account_username'] == test_domain['username'] and
                                              item['group_search_type'] == group_search_type[test_domain['recursive']] and
-                                             item['connection_type'] == test_domain['connection_type']
-               ):
+                                             item['connection_type'] == test_domain['connection_type']):
             result = True
+
     assert result
 
 
@@ -493,10 +491,10 @@ def test_update_auth_directory_pe():
     config_obj = prism.Config(api_client=_pe_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        config_update_auth_dir = config_obj.set_auth_dir(name=test_domain['name'], directory_type=test_domain['directory_type'],
-                                                         directory_url=test_domain['directory_url'], domain=test_domain['domain'],
-                                                         username=test_domain['username'], password=test_domain['password'], recursive=test_domain['recursive'],
-                                                         connection_type=test_domain['connection_type'], clusteruuid=each_uuid)
+        config_obj.set_auth_dir(name=test_domain['name'], directory_type=test_domain['directory_type'],
+                                directory_url=test_domain['directory_url'], domain=test_domain['domain'],
+                                username=test_domain['username'], password=test_domain['password'], recursive=test_domain['recursive'],
+                                connection_type=test_domain['connection_type'], clusteruuid=each_uuid)
         auth_dirs = config_obj.get_auth_dirs(clusteruuid=each_uuid)
         if any(item for item in auth_dirs if item['name'] == test_domain['name'] and
                                              item['directory_type'] == test_domain['directory_type'] and
@@ -555,10 +553,10 @@ def test_add_local_user_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for user in test_users:
-            config_local_user = config_obj.set_local_user(username=user['username'], password=user['password'], firstname=user['firstname'],
-                                                          lastname=user['lastname'], email=user['email'], enabled=user['enabled'],
-                                                          cluster_admin=user['cluster_admin'], user_admin=user['user_admin'], language=user['language'],
-                                                          clusteruuid=each_uuid)
+            config_obj.set_local_user(username=user['username'], password=user['password'], firstname=user['firstname'],
+                                      lastname=user['lastname'], email=user['email'], enabled=user['enabled'],
+                                      cluster_admin=user['cluster_admin'], user_admin=user['user_admin'], language=user['language'],
+                                      clusteruuid=each_uuid)
             local_users = config_obj.get_local_users(clusteruuid=each_uuid)
             if any(item for item in local_users if item['profile']['username'] == user['username'] and
                                                    item['profile']['firstName'] == user['firstname'] and
@@ -606,10 +604,10 @@ def test_update_local_user_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for user in test_users:
-            config_local_user = config_obj.set_local_user(username=user['username'], password=user['password'], firstname=user['firstname'],
-                                                          lastname=user['lastname'], email=user['email'], enabled=user['enabled'],
-                                                          cluster_admin=user['cluster_admin'], user_admin=user['user_admin'], language=user['language'],
-                                                          clusteruuid=each_uuid)
+            config_obj.set_local_user(username=user['username'], password=user['password'], firstname=user['firstname'],
+                                      lastname=user['lastname'], email=user['email'], enabled=user['enabled'],
+                                      cluster_admin=user['cluster_admin'], user_admin=user['user_admin'], language=user['language'],
+                                      clusteruuid=each_uuid)
             local_users = config_obj.get_local_users(clusteruuid=each_uuid)
             if any(item for item in local_users if item['profile']['username'] == user['username'] and
                                                    item['profile']['firstName'] == user['firstname'] and
@@ -668,7 +666,7 @@ def test_delete_local_user_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for user in test_users:
-            config_add_local_user = config_obj.remove_local_user(username=user['username'], clusteruuid=each_uuid)
+            config_obj.remove_local_user(username=user['username'], clusteruuid=each_uuid)
 
             local_users = config_obj.get_local_users(clusteruuid=each_uuid)
             if not any(item for item in local_users if item['profile']['username'] == user['username']):
@@ -716,12 +714,12 @@ def test_add_domain_group_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for auth_entity in test_auth_entities:
-            config_add_auth = config_obj.set_auth_dir_role_mapping(directory=auth_entity['directory'],
-                                                                   directory_entities=auth_entity['directory_entities'],
-                                                                   directory_entity_type=auth_entity['directory_entity_type'],
-                                                                   cluster_admin=auth_entity['cluster_admin'],
-                                                                   user_admin=auth_entity['user_admin'],
-                                                                   clusteruuid=each_uuid)
+            config_obj.set_auth_dir_role_mapping(directory=auth_entity['directory'],
+                                                 directory_entities=auth_entity['directory_entities'],
+                                                 directory_entity_type=auth_entity['directory_entity_type'],
+                                                 cluster_admin=auth_entity['cluster_admin'],
+                                                 user_admin=auth_entity['user_admin'],
+                                                 clusteruuid=each_uuid)
 
             auth_roles = config_obj.get_auth_dir_role_mappings(clusteruuid=each_uuid)
 
@@ -766,12 +764,12 @@ def test_update_domain_group_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for auth_entity in test_auth_entities:
-            config_add_auth = config_obj.set_auth_dir_role_mapping(directory=auth_entity['directory'],
-                                                                   directory_entities=auth_entity['directory_entities'],
-                                                                   directory_entity_type=auth_entity['directory_entity_type'],
-                                                                   cluster_admin=auth_entity['cluster_admin'],
-                                                                   user_admin=auth_entity['user_admin'],
-                                                                   clusteruuid=each_uuid)
+            config_obj.set_auth_dir_role_mapping(directory=auth_entity['directory'],
+                                                 directory_entities=auth_entity['directory_entities'],
+                                                 directory_entity_type=auth_entity['directory_entity_type'],
+                                                 cluster_admin=auth_entity['cluster_admin'],
+                                                 user_admin=auth_entity['user_admin'],
+                                                 clusteruuid=each_uuid)
 
             auth_roles = config_obj.get_auth_dir_role_mappings(clusteruuid=each_uuid)
 
@@ -816,12 +814,12 @@ def test_delete_domain_group_pe():
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
         for auth_entity in test_auth_entities:
-            config_removed_auth = config_obj.remove_auth_dir_role_mapping(directory=auth_entity['directory'],
-                                                                          directory_entities=auth_entity['directory_entities'],
-                                                                          directory_entity_type=auth_entity['directory_entity_type'],
-                                                                          cluster_admin=auth_entity['cluster_admin'],
-                                                                          user_admin=auth_entity['user_admin'],
-                                                                          clusteruuid=each_uuid)
+            config_obj.remove_auth_dir_role_mapping(directory=auth_entity['directory'],
+                                                    directory_entities=auth_entity['directory_entities'],
+                                                    directory_entity_type=auth_entity['directory_entity_type'],
+                                                    cluster_admin=auth_entity['cluster_admin'],
+                                                    user_admin=auth_entity['user_admin'],
+                                                    clusteruuid=each_uuid)
 
             auth_roles = config_obj.get_auth_dir_role_mappings(clusteruuid=each_uuid)
 
@@ -859,7 +857,8 @@ def test_delete_auth_directory_pe():
 
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        config_update_auth_dir = config_obj.remove_auth_dir(name=test_domain['name'], clusteruuid=each_uuid)
+        config_obj.remove_auth_dir(name=test_domain['name'], clusteruuid=each_uuid)
+
         auth_dirs = config_obj.get_auth_dirs(clusteruuid=each_uuid)
         if not any(item for item in auth_dirs if item['name'] == test_domain['name'] and
                                                  item['directory_type'] == test_domain['directory_type'] and
@@ -889,9 +888,9 @@ def test_update_alert_config_pe():
 
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        alert_configuration = config_obj.update_alert_config(email_list=alert_config['email_list'], enable=alert_config['enable'],
-                                                          enable_default=alert_config['enable_default'], enable_digest=alert_config['enable_digest'],
-                                                          clusteruuid=each_uuid)
+        config_obj.update_alert_config(email_list=alert_config['email_list'], enable=alert_config['enable'],
+                                       enable_default=alert_config['enable_default'], enable_digest=alert_config['enable_digest'],
+                                       clusteruuid=each_uuid)
 
         config = config_obj.get_alert_config(clusteruuid=each_uuid)
 
@@ -913,7 +912,9 @@ def test_delete_alert_config_pe():
 
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        alert_configuration = config_obj.remove_alert_config(clusteruuid=each_uuid)
-        config = config_obj.get_alert_config(clusteruuid=each_uuid)
+        config_obj.remove_alert_config(clusteruuid=each_uuid)
+
+        # Need to add check
+        result = True
 
     assert result
