@@ -58,10 +58,9 @@ sast:
   stage: test
   variables:
     SAST_DEFAULT_ANALYZERS: bandit, pmd-apex, security-code-scan, spotbugs
-    SAST_BANDIT_EXCLUDED_PATHS: "*/tests/*, */venv/*, */tox/*"
-  only:
-    refs:
-      - branches
+    SAST_BANDIT_EXCLUDED_PATHS: "*/tests/*, */venv/*, */tox/*, */.*/*"
+  rules:
+    - if: $CI_COMMIT_TAG == null
 include:
   - template: Security/SAST.gitlab-ci.yml
 
