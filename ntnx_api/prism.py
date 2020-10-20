@@ -349,27 +349,29 @@ class Config(object):
         :type color2: Second color value to set
         :type color2: str
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         ui_colors = self.get_ui_color(clusteruuid=clusteruuid)
         if ui_colors.get('color1') and ui_colors.get('color1') != color2:
             self._update_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='color_in', setting_value=color1, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
         elif ui_colors.get('color2') and ui_colors.get('color2') != color2:
             self._update_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='color_out', setting_value=color2, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
         else:
             self._add_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='color_in', setting_value=color1, clusteruuid=clusteruuid)
             self._add_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='color_out', setting_value=color2, clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
-        self.get_ui_config(clusteruuid=clusteruuid)
-        return changed
+        if result:
+            self.get_ui_config(clusteruuid=clusteruuid)
+
+        return result
 
     # UI title & blurb
     def get_ui_text(self, clusteruuid=None):
@@ -409,29 +411,30 @@ class Config(object):
         :type blurb: Logon UI blurb text (Below the username/password field)
         :type blurb: str
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
-
+        result = None
         ui_text = self.get_ui_text(clusteruuid=clusteruuid)
 
         if ui_text.get('title') and ui_text.get('title') != title:
             self._update_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='product_title', setting_value=title, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='product_title', setting_value=blurb, clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
         if ui_text.get('blurb') and ui_text.get('blurb') != blurb:
             self._update_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='title', setting_value=blurb, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='CUSTOM_LOGIN_SCREEN', setting_key='title', setting_value=blurb, clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
-        self.get_ui_config(clusteruuid=clusteruuid)
-        return changed
+        if result:
+            self.get_ui_config(clusteruuid=clusteruuid)
+
+        return result
 
     # UI logon banner
     def get_ui_banner(self, clusteruuid=None):
@@ -473,28 +476,30 @@ class Config(object):
         :type content: Logon UI banner content
         :type content: str
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         ui_banner = self.get_ui_banner(clusteruuid=clusteruuid)
         if ui_banner.get('status') and ui_banner.get('status') != status:
             self._update_ui_setting(setting_type='WELCOME_BANNER', setting_key='welcome_banner_status', setting_value=str(status), clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='WELCOME_BANNER', setting_key='welcome_banner_status', setting_value=str(status), clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
         if ui_banner.get('content') and ui_banner.get('content') != content:
             self._update_ui_setting(setting_type='WELCOME_BANNER', setting_key='welcome_banner_content', setting_value=content, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='WELCOME_BANNER', setting_key='welcome_banner_content', setting_value=content, clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
-        self.get_ui_config(clusteruuid=clusteruuid)
-        return changed
+        if result:
+            self.get_ui_config(clusteruuid=clusteruuid)
+
+        return result
 
     # UI 2048 game
     def get_ui_2048_game(self, clusteruuid=None):
@@ -534,21 +539,23 @@ class Config(object):
         :type status: 2048 game status
         :type status: bool
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         ui_2048_status = self.get_ui_2048_game(clusteruuid=clusteruuid)
         if ui_2048_status.get('status') and ui_2048_status.get('status') != status:
             self._update_ui_setting(setting_type='UI_CONFIG', setting_key='disable_2048', setting_value=str(status).lower(), clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='UI_CONFIG', setting_key='disable_2048', setting_value=str(status).lower(), clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
-        self.get_ui_config(clusteruuid=clusteruuid)
-        return changed
+        if result:
+            self.get_ui_config(clusteruuid=clusteruuid)
+
+        return result
 
     # UI animation
     def get_ui_animation(self, clusteruuid=None):
@@ -588,21 +595,23 @@ class Config(object):
         :type status: animated background particle status
         :type status: bool
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         ui_animation_status = self.get_ui_animation(clusteruuid=clusteruuid)
         if ui_animation_status.get('status') and ui_animation_status.get('status') != status:
             self._update_ui_setting(setting_type='welcome_banner', setting_key='disable_video', setting_value=str(status).lower(), clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
         else:
             self._add_ui_setting(setting_type='welcome_banner', setting_key='disable_video', setting_value=str(status).lower(), clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
-        self.get_ui_config(clusteruuid=clusteruuid)
-        return changed
+        if result:
+            self.get_ui_config(clusteruuid=clusteruuid)
+
+        return result
 
     def get_pulse(self, clusteruuid=None):
         """Get pulse config for a specific cluster
@@ -659,10 +668,10 @@ class Config(object):
         :type email_nutanix: Send pulse data to nutnaix via email
         :type email_nutanix: bool, optional
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if self.pulse.get(clusteruuid):
             self.get_pulse(clusteruuid=clusteruuid)
@@ -671,11 +680,12 @@ class Config(object):
                 bool(self.pulse.get(clusteruuid).get('enableDefaultNutanixEmail')) != email_nutanix or \
                 self.pulse.get(clusteruuid).get('emailContactList') != email_address_list:
             self.update_pulse(enable=enable, email_nutanix=email_nutanix, email_address_list=email_address_list, clusteruuid=clusteruuid)
+            result = 'updated'
 
+        if result:
             self.get_pulse(clusteruuid=clusteruuid)
-            changed = True
 
-        return changed
+        return result
 
     def get_smtp(self, clusteruuid=None):
         """Get smtp config for a specific cluster
@@ -795,11 +805,14 @@ class Config(object):
         :type password: str, optional
         :param force: Force update regardless of differences `(default=False)`
         :type force: bool, optional
+
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not self.smtp.get(clusteruuid):
-            current_smtp = self.get_smtp(clusteruuid=clusteruuid)
+            self.get_smtp(clusteruuid=clusteruuid)
 
         if mode and mode not in ('tls', 'ssl'):
             raise ValueError('smtp mode needs to be "tls", "ssl" or None.')
@@ -815,7 +828,7 @@ class Config(object):
                     self.smtp.get(clusteruuid).get('from_email_address') != from_email_address or \
                     self.smtp.get(clusteruuid).get('port') != port:
                 self.update_smtp(address, from_email_address, port, secure_mode=mode, username=username, password=password, clusteruuid=clusteruuid)
-                changed = True
+                result = 'updated'
 
         else:
             if (self.smtp.get(clusteruuid).get('address') and self.smtp.get(clusteruuid).get('from_email_address') and self.smtp.get(clusteruuid).get(
@@ -826,12 +839,15 @@ class Config(object):
                     self.smtp.get(clusteruuid).get('secure_mode') != self._get_smtp_mode(mode) or \
                     self.smtp.get(clusteruuid).get('username') != username:
                 self.update_smtp(address, from_email_address, port, secure_mode=mode, username=username, password=password, clusteruuid=clusteruuid)
-                changed = True
+                result = 'added'
 
-        if changed:
+        if result:
             self.get_smtp(clusteruuid=clusteruuid)
 
-        return changed
+        if result:
+            self.get_smtp(clusteruuid=clusteruuid)
+
+        return result
 
     def get_auth_types(self, clusteruuid=None):
         """Get authentication types for a specific cluster
@@ -1029,8 +1045,11 @@ class Config(object):
         :type connection_type: str('LDAP'), optional
         :param force: Force directory update. Use this to update the password of the auth domain user.
         :type force: bool, optional
+
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not self.auth_directories.get(clusteruuid):
             self.get_auth_dirs(clusteruuid=clusteruuid)
@@ -1046,7 +1065,7 @@ class Config(object):
                               recursive=recursive, directory_type=directory_type, connection_type=connection_type)
 
             self.get_auth_dirs(clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
         # Update defined directory
         elif len(self.auth_directories.get(clusteruuid)) == 1 and \
@@ -1062,13 +1081,16 @@ class Config(object):
             self.update_auth_dir(name=name, directory_url=directory_url, domain=domain, username=username, password=password,
                                  recursive=recursive, directory_type=directory_type, connection_type=connection_type)
             self.get_auth_dirs(clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
         # More than 1 directory defined
         elif not len(self.auth_directories.get(clusteruuid)) > 1:
             pass
 
-        return changed
+        if result:
+            self.get_auth_dirs(clusteruuid=clusteruuid)
+
+        return result
 
     def get_auth_dir_role_mappings(self, clusteruuid=None):
         """Get all authentication role mappings for a specific cluster
@@ -1266,6 +1288,9 @@ class Config(object):
         :type cluster_admin: bool, optional
         :param user_admin: Whether to grant user `User Admin` privilege
         :type user_admin: bool, optional
+
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
         result = None
 
@@ -1297,6 +1322,9 @@ class Config(object):
             self.update_auth_dir_role_mapping(directory=directory, directory_entities=directory_entities, directory_entity_type=directory_entity_type,
                                               cluster_admin=cluster_admin, user_admin=user_admin, clusteruuid=clusteruuid)
             result = 'updated'
+            self.get_auth_dir_role_mappings(clusteruuid=clusteruuid)
+
+        if result:
             self.get_auth_dir_role_mappings(clusteruuid=clusteruuid)
 
         return result
@@ -1512,8 +1540,11 @@ class Config(object):
         :type language: str('en-US','zh-CN','ja-JP'), optional
         :param enabled: Enable user account `(default=True)`
         :type enabled: bool, optional
+
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not self.local_users.get(clusteruuid):
             self.get_local_users(clusteruuid=clusteruuid)
@@ -1528,7 +1559,7 @@ class Config(object):
             self.add_local_user(username=username, password=password, firstname=firstname, lastname=lastname, email=email, enabled=enabled,
                                 cluster_admin=cluster_admin, user_admin=user_admin, language=language, clusteruuid=None)
             self.get_local_users(clusteruuid=clusteruuid)
-            changed = False
+            result = 'added'
 
         # user config does not match, update user
         elif local_user and \
@@ -1542,9 +1573,12 @@ class Config(object):
             self.update_local_user(username=username, password=password, firstname=firstname, lastname=lastname, email=email, enabled=enabled,
                                    cluster_admin=cluster_admin, user_admin=user_admin, language=language, clusteruuid=None)
             self.get_local_users(clusteruuid=clusteruuid)
-            changed = False
+            result = 'updated'
 
-        return changed
+        if result:
+            self.get_local_users(clusteruuid=clusteruuid)
+
+        return result
 
     def get_alert_config(self, clusteruuid=None):
         """Get alert configuration for specified cluster
@@ -1700,10 +1734,10 @@ class Config(object):
         :type ntp_servers: An ordered list of ntp servers
         :type ntp_servers: list, optional
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not ntp_servers:
             raise ValueError('no ntp server list provided.')
@@ -1715,23 +1749,20 @@ class Config(object):
         if len(self.ntp_servers.get(clusteruuid)) == 0:
             for ntp_server in ntp_servers:
                 self.add_ntp(ntp_server)
-
-            changed = True
+            result = 'added'
 
         # If the NTP servers are not in the right order
         elif not collections.Counter(ntp_servers) == collections.Counter(self.ntp_servers.get(clusteruuid)):
             for ntp_server in self.get_ntp(clusteruuid=clusteruuid):
                 self.remove_ntp(ntp_server)
-
             for ntp_server in ntp_servers:
                 self.add_ntp(ntp_server)
+            result = 'updated'
 
-            changed = True
-
-        if changed:
+        if result:
             self.get_ntp(clusteruuid=clusteruuid)
 
-        return changed
+        return result
 
     def get_dns(self, clusteruuid=None):
         """Retrieve dns servers configured for a specific cluster
@@ -1802,10 +1833,10 @@ class Config(object):
         :type dns_servers: An ordered list of dns servers
         :type dns_servers: list, optional
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not dns_servers:
             raise ValueError('no dns server list provided.')
@@ -1816,7 +1847,7 @@ class Config(object):
         if len(self.dns_servers.get(clusteruuid)) == 0:
             for dns_server in dns_servers:
                 self.add_dns(dns_server)
-            changed = True
+            result = 'added'
 
         elif not collections.Counter(dns_servers) == collections.Counter(self.get_dns(clusteruuid=clusteruuid)):
             for dns_server in self.get_dns(clusteruuid=clusteruuid):
@@ -1824,9 +1855,12 @@ class Config(object):
 
             for dns_server in dns_servers:
                 self.add_dns(dns_server)
-            changed = True
+            result = 'updated'
 
-        return changed
+        if result:
+            self.get_dns(clusteruuid=clusteruuid)
+
+        return result
 
     def get_proxy(self, clusteruuid=None):
         """Retrieve proxy configured for a specific cluster
@@ -1969,10 +2003,10 @@ class Config(object):
         :type socks: Enable socks for the proxy
         :type socks: bool, optional
 
-        :returns: `True` if changed, `False` otherwise
-        :rtype: ResponseList
+        :returns: `updated` if changed, `added` if created or None otherwise
+        :rtype: str
         """
-        changed = False
+        result = None
 
         if not address:
             raise ValueError('no proxy address provided.')
@@ -1995,27 +2029,30 @@ class Config(object):
         # If no proxy defined
         if not self.proxy.get(clusteruuid) or len(self.proxy.get(clusteruuid)) == 0:
             self.add_proxy(name=name, address=address, port=port, proxy_types=proxy_types, username=username, password=password, clusteruuid=clusteruuid)
-            changed = True
+            result = 'added'
 
         # If more than 1 proxy , remove all proxies and add new config
         elif len(self.proxy.get(clusteruuid)) > 1:
             for configured_proxy in self.proxy.get(clusteruuid):
                 self.remove_proxy(configured_proxy.get('name'))
             self.add_proxy(name=name, address=address, port=port, proxy_types=proxy_types, username=username, password=password, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
         # If 1 proxy defined, update if name matches
         elif len(self.proxy.get(clusteruuid)) == 1 and self.proxy.get(clusteruuid)[0].get('name') == name:
             self.update_proxy(name=name, address=address, port=port, proxy_types=proxy_types, username=username, password=password, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
         # If 1 proxy defined, if name does not match remove and add new config
         elif len(self.proxy.get(clusteruuid)) == 1 and self.proxy.get(clusteruuid)[0].get('name') != name:
             self.remove_proxy(name=self.proxy.get(clusteruuid)[0].get('name'), clusteruuid=clusteruuid)
             self.add_proxy(name=name, address=address, port=port, proxy_types=proxy_types, username=username, password=password, clusteruuid=clusteruuid)
-            changed = True
+            result = 'updated'
 
-        return changed
+        if result:
+            self.get_proxy(clusteruuid=clusteruuid)
+
+        return result
 
 
 class Cluster(object):

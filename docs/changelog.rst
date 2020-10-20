@@ -25,3 +25,4 @@ A log of changes by version and date.
     "0.0.16", "10/15/2020", "Added alert configuration to ntnx_api.prism"
     "0.0.17", "10/15/2020", "Added SAST to gitlab-ci.yml. Added tests for all added functions."
     "1.0.0", "10/19/2020", "Release 1.0.0."
+    "1.0.1", "10/20/2020", "For all set_* functions in ntnx_api.prism updated the return value to indicate whether a record has been added or updated."
