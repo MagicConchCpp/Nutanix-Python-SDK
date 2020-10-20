@@ -54,18 +54,6 @@ pytest:
   tags:
     - nutanix_cluster
 
-sast:
-  stage: test
-  variables:
-    SAST_DEFAULT_ANALYZERS: bandit
-    SAST_BANDIT_EXCLUDED_PATHS: "*/tests/*, */venv/*, */tox/*, */.*/*"
-  rules:
-    - if: $CI_COMMIT_TAG == null
-  allow_failure: true
-
-include:
-  - template: Security/SAST.gitlab-ci.yml
-
 source:
   stage: build
   only:
