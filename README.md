@@ -1,2 +1,0 @@
-# Nutanix API Library
-
