@@ -23,10 +23,10 @@ the following in a Python interpreter:
 
 .. code-block:: python
 
-    >>> from ntnx_api import client
-    >>> ntnx_api = client.ApiClient(
+    >>> from ntnx_api.client import ApiClient
+    >>> ntnx_api = ApiClient(
     >>>   connection_type = 'pe',
-    >>>   ip_address=1.1.1.1
+    >>>   ip_address='1.1.1.1'
     >>>   username='admin'
     >>>   password='nutanix/4u'
     >>> )
@@ -38,3 +38,5 @@ If that succeeds without an ImportError, you are ready to start using the client
     >>> from ntnx_api import prism
     >>> ntnx_cluster = prism.Cluster(api_client=ntnx_api)
     >>> clusters = ntnx_clusters.get_clusters()
+    >>> print(len(clusters))
+
