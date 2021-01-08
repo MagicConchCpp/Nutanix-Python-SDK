@@ -435,7 +435,7 @@ def test_add_auth_directory_pe():
     test_domain = {
         'name': 'ntnx-lab',
         'directory_type': 'ACTIVE_DIRECTORY',
-        'directory_url': 'ldap://192.168.1.196:389',
+        'directory_url': 'ldap://192.168.1.24:389',
         'domain': 'ntnx-lab.local',
         'recursive': False,
         'connection_type': 'LDAP',
@@ -839,7 +839,7 @@ def test_delete_auth_directory_pe():
     test_domain = {
         'name': 'ntnx-lab',
         'directory_type': 'ACTIVE_DIRECTORY',
-        'directory_url': 'ldap://192.168.1.196:389',
+        'directory_url': 'ldap://192.168.1.24:389',
         'domain': 'ntnx-lab.local',
         'recursive': False,
         'connection_type': 'LDAP',
