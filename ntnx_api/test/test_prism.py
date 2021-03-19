@@ -1,14 +1,14 @@
 #!/usr/bin/python
-from ntnx_api.client import ApiClient
+from ntnx_api.client import PrismApi
 from ntnx_api import prism
 
 
 def _pe_api():
-    return ApiClient(connection_type='pe', ip_address='192.168.1.7', username='admin', password='uwpOF!1pfQEbTWHWv*kv0HGLNL&QD^4u')
+    return PrismApi(ip_address='192.168.1.7', username='admin', password='uwpOF!1pfQEbTWHWv*kv0HGLNL&QD^4u')
 
 
 def _pc_api():
-    return ApiClient(connection_type='pc', ip_address='192.168.1.44', username='admin', password='fUUif4l0CF!iPVv2mpE6wbT9&Rf5tw')
+    return PrismApi(ip_address='192.168.1.44', username='admin', password='fUUif4l0CF!iPVv2mpE6wbT9&Rf5tw')
 
 
 def test_return_clusters_pe():
