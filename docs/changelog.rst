@@ -26,3 +26,5 @@ A log of changes by version and date.
     "0.0.17", "10/15/2020", "Added SAST to gitlab-ci.yml. Added tests for all added functions."
     "1.0.0", "10/19/2020", "Release 1.0.0."
     "1.0.1", "10/20/2020", "For all set_* functions in ntnx_api.prism updated the return value to indicate whether a record has been added or updated."
+    "1.1.1", "3/19/2021", "Added new PrismApi class to client.py to replace existing ApiClient class. Added console logged for enhanced troubleshooting. Added Image upload from URL & file. Added task monitoring to support image upload completion tracking."
+    "1.1.2", "3/19/2021", "Fix to ensure that class variables holding data are cleaned up prior to be refreshed."

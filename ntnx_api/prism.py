@@ -2231,6 +2231,11 @@ class Cluster(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        # Remove existing data for this cluster if it exists
+        if self.cluster.get(clusteruuid):
+            self.cluster.pop(clusteruuid)
+            logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
+
         self.cluster[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.cluster
 
@@ -2332,6 +2337,11 @@ class Hosts(object):
         params = {}
         payload = None
         uri = '/hosts'
+
+        # Remove existing data for this cluster if it exists
+        if self.hosts.get(clusteruuid):
+            self.hosts.pop(clusteruuid)
+            logger.info('removing existing data from class dict hosts for cluster {0}'.format(clusteruuid))
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
@@ -2443,10 +2453,15 @@ class Vms(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        # Remove existing data for this cluster if it exists
+        if self.vms.get(clusteruuid):
+            self.vms.pop(clusteruuid)
+            logger.info('removing existing data from class dict vms for cluster {0}'.format(clusteruuid))
+
         self.vms[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.vms[clusteruuid]
 
-    def search_uuid(self, uuid, clusteruuid=None):
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2460,7 +2475,7 @@ class Vms(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.search_uuid')
         found = {}
-        if not self.vms.get(clusteruuid):
+        if not self.vms.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.vms.get(clusteruuid):
@@ -2470,7 +2485,7 @@ class Vms(object):
 
         return found
 
-    def search_name(self, name, clusteruuid=None):
+    def search_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm name
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2484,7 +2499,7 @@ class Vms(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.search_name')
         found = {}
-        if not self.vms.get(clusteruuid):
+        if not self.vms.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.vms.get(clusteruuid):
@@ -2521,8 +2536,9 @@ class Images(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Images.get')
         logger.info('starting function to retrieve images from cluster api')
+
         # Remove existing data for this cluster if it exists
-        if self.images.get('clusteruuid'):
+        if self.images.get(clusteruuid):
             self.images.pop(clusteruuid)
             logger.info('removing existing data from class dict images for cluster {0}'.format(clusteruuid))
 
@@ -2553,11 +2569,7 @@ class Images(object):
         logger = logging.getLogger('ntnx_api.prism.Images.search_uuid')
         logger.info('starting function to search for image by uuid')
         found = {}
-        if not self.images.get(clusteruuid):
-            self.get(clusteruuid)
-
-        if refresh:
-            logger.info('refreshing existing images dataset from API')
+        if not self.images.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.images.get(clusteruuid):
@@ -2589,11 +2601,7 @@ class Images(object):
         logger = logging.getLogger('ntnx_api.prism.Images.search_name')
         logger.info('starting function to search for image by name')
         found = {}
-        if not self.images.get(clusteruuid):
-            self.get(clusteruuid)
-
-        if refresh:
-            logger.info('refreshing existing images dataset from API')
+        if not self.images.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.images.get(clusteruuid):
@@ -2865,7 +2873,7 @@ class StorageContainer(object):
         self.storage_containers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.storage_containers[clusteruuid]
 
-    def search_uuid(self, uuid, clusteruuid=None):
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific container, in a specific cluster by container uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2878,7 +2886,7 @@ class StorageContainer(object):
         """
         logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_uuid')
         found = {}
-        if not self.storage_containers.get(clusteruuid):
+        if not self.storage_containers.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.storage_containers.get(clusteruuid):
@@ -2888,7 +2896,7 @@ class StorageContainer(object):
 
         return found
 
-    def search_name(self, name, clusteruuid=None):
+    def search_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific container, in a specific cluster by container uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2902,7 +2910,7 @@ class StorageContainer(object):
         """
         logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_name')
         found = {}
-        if not self.storage_containers.get(clusteruuid):
+        if not self.storage_containers.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.storage_containers.get(clusteruuid):
@@ -2950,7 +2958,7 @@ class StorageVolume(object):
         logger = logging.getLogger('ntnx_api.prism.StorageVolume.get_volume_groups')
 
         # Remove existing data for this cluster if it exists
-        if self.volume_groups[clusteruuid]:
+        if self.volume_groups.get(clusteruuid):
             self.volume_groups.pop(clusteruuid)
             logger.info('removing existing data from class dict volume_groups for cluster {0}'.format(clusteruuid))
 
@@ -2964,7 +2972,7 @@ class StorageVolume(object):
         self.volume_groups[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.volume_groups[clusteruuid]
 
-    def search_volume_groups_uuid(self, uuid, refresh=False, clusteruuid=None):
+    def search_volume_groups_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific volume group, in a specific cluster by volume group uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2978,13 +2986,8 @@ class StorageVolume(object):
         """
         logger = logging.getLogger('ntnx_api.prism.StorageVolume.search_volume_groups_uuid')
         found = {}
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
             logger.info('retreving volume group dataset from API')
-            self.get_volume_groups(clusteruuid)
-
-        if refresh:
-            logger.info('refreshing exising volume group dataset from API')
-            self.volume_groups = {}
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
@@ -2994,7 +2997,7 @@ class StorageVolume(object):
 
         return found
 
-    def search_volume_groups_name(self, name, clusteruuid=None):
+    def search_volume_groups_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific volume group, in a specific cluster by volume group uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -3007,7 +3010,7 @@ class StorageVolume(object):
         """
         logger = logging.getLogger('ntnx_api.prism.StorageVolume.search_volume_groups_name')
         found = {}
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
@@ -3017,7 +3020,7 @@ class StorageVolume(object):
 
         return found
 
-    def get_volumes(self, clusteruuid=None):
+    def get_volumes(self, clusteruuid=None, refresh=False):
         """Retrieve data for each volume in a specific cluster
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -3030,13 +3033,13 @@ class StorageVolume(object):
         logger = logging.getLogger('ntnx_api.prism.StorageVolume.get_volumes')
 
         # Remove existing data for this cluster if it exists
-        if self.volumes[clusteruuid]:
+        if self.volumes.get(clusteruuid):
             self.volumes.pop(clusteruuid)
             logger.info('removing existing data from class dict volumes for cluster {0}'.format(clusteruuid))
 
         result = []
 
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
