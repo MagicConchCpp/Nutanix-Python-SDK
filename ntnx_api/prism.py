@@ -50,6 +50,7 @@ import logging.config
 import time
 from random import random
 import threading
+import paramiko
 
 __metaclass__ = type
 
@@ -2153,6 +2154,37 @@ class Config(object):
             self.get_proxy(clusteruuid=clusteruuid)
 
         return result
+
+    def accept_elua(self, name, title, company, clusteruuid=None):
+        """Accept the Nutanix ELUA
+
+        :param name: Your name
+        :type name: str
+        :param title: Your job title
+        :type title: str
+        :param company: Name of your company
+        :type company: str
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config._get_group_search_type')
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        uri = '/eulas/accept'
+        method = 'POST'
+        payload = {
+            "username": name,
+            "companyName": company,
+            "jobTitle": title
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method)
 
 
 class Cluster(object):
