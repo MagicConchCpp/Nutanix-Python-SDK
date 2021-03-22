@@ -465,7 +465,7 @@ class PrismApi(object):
         except Exception as err:
             raise NutanixError(err)
 
-    def request(self, uri, api_version=None, payload=None, params=None, response_code=200, timeout=120, method=None):
+    def request(self, uri, api_version=None, payload=None, params=None, response_code=None, timeout=120, method=None):
         """Perform HTTP request for REST API.
 
         :param uri: URI of resource to interact with
@@ -505,14 +505,15 @@ class PrismApi(object):
             logger.debug('api version being called: {0}'.format(api_version))
 
             request_url = '{0}{1}'.format(self.api_base[api_version], uri)
-            logger.debug('request url: {0}'.format(request_url))
+            logger.info('request url: {0}'.format(request_url))
 
             if self.connection_type != 'pc' and params and api_version != 'v3':
                 params.pop('proxyClusterUuid')
 
             method = method or ('POST' if payload else 'GET')
-            logger.debug('request method: {0}'.format(method))
-            logger.debug('request payload: {0}'.format(json.dumps(payload)))
+            logger.info('request method: {0}'.format(method))
+            logger.info('request payload: {0}'.format(json.dumps(payload)))
+            logger.info('request params: {0}'.format(params))
             # if self.cookies:
             #     response = requests.request(method, request_url, headers=headers, verify=self.validate_certs,
             #                             timeout=timeout, data=json.dumps(payload), params=params, cookies=self.cookies)
@@ -522,7 +523,7 @@ class PrismApi(object):
             response = requests.request(method, request_url, headers=headers, verify=self.validate_certs,
                                         timeout=timeout, data=json.dumps(payload), params=params)
             logger.debug('api response code: {0}'.format(response.status_code))
-            logger.debug('api response: {0}'.format(response.json()))
+            # logger.debug('api response: {0}'.format(response.json()))
 
         except requests.exceptions.HTTPError:
             raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
@@ -534,8 +535,13 @@ class PrismApi(object):
             raise NutanixError(err)
 
         try:
-            if response.status_code != response_code:
+            if not response_code:
+                if response.status_code not in range(200, 299):
+                    raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
+
+            elif response.status_code != response_code:
                 raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
+
             return response.json()
         except ValueError:
             return response.text

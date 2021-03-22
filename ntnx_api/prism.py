@@ -1771,6 +1771,10 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        if self.ntp_servers.get(clusteruuid):
+            logger.info("cleaning up existing class ntp records")
+            self.ntp_servers.pop(clusteruuid)
+
         self.ntp_servers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.ntp_servers[clusteruuid]
 
@@ -1846,9 +1850,9 @@ class Config(object):
         # If the NTP servers are not in the right order
         elif not collections.Counter(ntp_servers) == collections.Counter(self.ntp_servers.get(clusteruuid)):
             for ntp_server in self.get_ntp(clusteruuid=clusteruuid):
-                self.remove_ntp(ntp_server)
+                self.remove_ntp(ntp_server=ntp_server, clusteruuid=clusteruuid)
             for ntp_server in ntp_servers:
-                self.add_ntp(ntp_server)
+                self.add_ntp(ntp_server=ntp_server, clusteruuid=clusteruuid)
             result = 'updated'
 
         if result:
@@ -1874,6 +1878,10 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        if self.dns_servers.get(clusteruuid):
+            logger.info("cleaning up existing class dns records")
+            self.dns_servers.pop(clusteruuid)
+
         self.dns_servers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.dns_servers[clusteruuid]
 
@@ -1897,6 +1905,7 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        logger.info("adding dns server '{0}'".format(dns_server))
         self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
 
     def remove_dns(self, dns_server, clusteruuid=None):
@@ -1917,6 +1926,7 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        logger.info("removing dns server '{0}'".format(dns_server))
         self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
 
     def set_dns(self, clusteruuid=None, dns_servers=None):
@@ -1940,17 +1950,20 @@ class Config(object):
         if not self.dns_servers.get(clusteruuid):
             self.get_dns(clusteruuid=clusteruuid)
 
+        if len(dns_servers) > 3:
+            raise ValueError('a maximum of 3 dns servers can be set.')
+
         if len(self.dns_servers.get(clusteruuid)) == 0:
             for dns_server in dns_servers:
-                self.add_dns(dns_server)
+                self.add_dns(dns_server, clusteruuid=clusteruuid)
             result = 'added'
 
         elif not collections.Counter(dns_servers) == collections.Counter(self.get_dns(clusteruuid=clusteruuid)):
             for dns_server in self.get_dns(clusteruuid=clusteruuid):
-                self.remove_dns(dns_server)
+                self.remove_dns(dns_server=dns_server, clusteruuid=clusteruuid)
 
             for dns_server in dns_servers:
-                self.add_dns(dns_server)
+                self.add_dns(dns_server, clusteruuid=clusteruuid)
             result = 'updated'
 
         if result:

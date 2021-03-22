@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.7", "3/22/2021", "Separated prism tests into more a more logical structure. Resolved issues with NTP & DNS functions."
     "1.1.6", "3/22/2021", "Fixed code quality issues identified by flake8. Also, resolved issue with tox.ini"
     "1.1.5", "3/22/2021", "Removed logging from requirements.txt"
     "1.1.3", "3/19/2021", "Re-ordered changelog to improve readability. Added Config.accept_elua"
