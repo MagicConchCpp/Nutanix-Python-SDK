@@ -535,9 +535,8 @@ class PrismApi(object):
             raise NutanixError(err)
 
         try:
-            if not response_code:
-                if response.status_code not in range(200, 299):
-                    raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
+            if not response_code and response.status_code not in range(200, 299):
+                raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
 
             elif response.status_code != response_code:
                 raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
