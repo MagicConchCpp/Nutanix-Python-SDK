@@ -44,6 +44,13 @@ StorageVolume
 
 from __future__ import (absolute_import, division, print_function)
 import collections
+from deprecated.sphinx import deprecated, versionadded, versionchanged
+import logging
+import logging.config
+import time
+from random import random
+import threading
+import paramiko
 
 __metaclass__ = type
 
@@ -75,6 +82,34 @@ EXAMPLES = r'''
 '''
 
 
+# Setup logging
+logger = logging.getLogger('ntnx_api.client')
+logging.config.dictConfig({
+    'version': 1,
+    'disable_existing_loggers': False,  # this fixes the problem
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        },
+    },
+    'handlers': {
+        'ntnx_api.prism': {
+            'level':'INFO',
+            'class':'logging.StreamHandler',
+            "formatter": "standard",
+            "stream": "ext://sys.stdout"
+        },
+    },
+    'loggers': {
+        '': {
+            'handlers': ['ntnx_api.prism'],
+            'level': 'INFO',
+            'propagate': True
+        }
+    }
+})
+
+
 class Config(object):
     """A class to represent the configuration of the Nutanix Prism Instance
 
@@ -83,6 +118,7 @@ class Config(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.Config.__init__')
         self.api_client = api_client
         self.categories = []
         self.category_keys = []
@@ -107,6 +143,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_config')
         params = {}
         payload = None
         uri = '/application/system_data'
@@ -122,6 +159,7 @@ class Config(object):
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_categories')
         params = {}
 
         if self.api_client.connection_type == "pc":
@@ -144,6 +182,7 @@ class Config(object):
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_category_keys')
         params = {}
 
         if self.api_client.connection_type == "pc":
@@ -169,6 +208,7 @@ class Config(object):
         .. note::
             Will only return data when `connection_type=='pc'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_category_key_usage')
         params = {}
         result = []
 
@@ -209,6 +249,7 @@ class Config(object):
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_projects')
         params = {}
 
         if self.api_client == "pc":
@@ -231,6 +272,7 @@ class Config(object):
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_project_usage')
         params = {}
         result = []
 
@@ -270,6 +312,7 @@ class Config(object):
         :type setting_value: UI setting value
         :type setting_value: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._add_ui_setting')
         params = {}
         uri = '/application/system_data'
         method = 'POST'
@@ -297,6 +340,7 @@ class Config(object):
         :type setting_value: UI setting value
         :type setting_value: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._update_ui_setting')
         params = {}
         uri = '/application/system_data'
         method = 'PUT'
@@ -322,6 +366,7 @@ class Config(object):
         :returns: A dict with the defined UI colors `{'color1': '#CC6164', 'color2':'#FFD055'}` or None
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_color')
         result = None
 
         if self.ui_config.get(clusteruuid):
@@ -352,6 +397,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ui_color')
         result = None
 
         ui_colors = self.get_ui_color(clusteruuid=clusteruuid)
@@ -384,6 +430,7 @@ class Config(object):
         :returns: A dict with the defined UI text `{'title': 'blah', 'blurb':'blah blah'}` or None
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_text')
         result = None
 
         if self.ui_config.get(clusteruuid):
@@ -414,6 +461,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ui_text')
         result = None
         ui_text = self.get_ui_text(clusteruuid=clusteruuid)
 
@@ -447,6 +495,7 @@ class Config(object):
         :returns: A dict with the defined UI banner `{'status': 'true', 'content':'blah blah'}` or None
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_banner')
         result = None
 
         if self.ui_config.get(clusteruuid):
@@ -479,6 +528,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ui_banner')
         result = None
 
         ui_banner = self.get_ui_banner(clusteruuid=clusteruuid)
@@ -512,6 +562,7 @@ class Config(object):
         :returns: A dict with the defined UI 2048 game setting `{'status': 'true'}` or None
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_2048_game')
         result = None
 
         if self.ui_config.get(clusteruuid):
@@ -542,6 +593,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ui_2048_game')
         result = None
 
         ui_2048_status = self.get_ui_2048_game(clusteruuid=clusteruuid)
@@ -568,6 +620,7 @@ class Config(object):
         :returns: A dict with the defined UI particle animation setting `{'status': 'true'}` or None
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ui_animation')
         result = None
 
         if self.ui_config.get(clusteruuid):
@@ -598,6 +651,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ui_animation')
         result = None
 
         ui_animation_status = self.get_ui_animation(clusteruuid=clusteruuid)
@@ -623,6 +677,7 @@ class Config(object):
         :returns: A dictionary describing pulse configuration from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_pulse')
         params = {}
         payload = None
         uri = '/pulse'
@@ -641,6 +696,7 @@ class Config(object):
         :type clusteruuid: str, optional
 
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_pulse')
         params = {}
         uri = '/pulse'
         method = 'PUT'
@@ -671,6 +727,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_pulse')
         result = None
 
         if self.pulse.get(clusteruuid):
@@ -697,6 +754,7 @@ class Config(object):
         :returns: A dictionary describing smtp configuration from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_smtp')
         params = {}
         payload = None
         uri = '/cluster/smtp'
@@ -717,6 +775,7 @@ class Config(object):
         :returns: Text for API smtp mode type variable defined by supplied boolean variable.
         :rtype: Str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._get_smtp_mode')
 
         modes = {
             'tls': 'STARTTLS',
@@ -745,6 +804,7 @@ class Config(object):
         :param password:
         :type password: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_smtp')
         params = {}
         uri = '/cluster/smtp'
         method = 'PUT'
@@ -774,6 +834,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_smtp')
         params = {}
         uri = '/cluster/smtp'
         method = 'DELETE'
@@ -809,6 +870,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_smtp')
         result = None
 
         if not self.smtp.get(clusteruuid):
@@ -844,9 +906,6 @@ class Config(object):
         if result:
             self.get_smtp(clusteruuid=clusteruuid)
 
-        if result:
-            self.get_smtp(clusteruuid=clusteruuid)
-
         return result
 
     def get_auth_types(self, clusteruuid=None):
@@ -856,6 +915,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_auth_types')
         params = {}
         uri = '/authconfig/auth_types'
         payload = None
@@ -873,6 +933,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_auth_dirs')
         params = {}
         uri = '/authconfig/directories'
         payload = None
@@ -893,6 +954,7 @@ class Config(object):
         :returns: Text for API group search type variable defined by supplied boolean variable.
         :rtype: Str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._get_group_search_type')
         group_search_type = {
             True: 'RECURSIVE',
             False: 'NON_RECURSIVE',
@@ -924,6 +986,7 @@ class Config(object):
         :param connection_type: Type of connection
         :type connection_type: str('LDAP'), optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_auth_dir')
         params = {}
         uri = '/authconfig/directories'
         method = 'POST'
@@ -973,6 +1036,7 @@ class Config(object):
         :param connection_type: Type of connection
         :type connection_type: str('LDAP'), optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_auth_dir')
         params = {}
         uri = '/authconfig/directories'
         method = 'PUT'
@@ -1011,6 +1075,7 @@ class Config(object):
         :param name: Directory name
         :type name: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_auth_dir')
         params = {}
         uri = '/authconfig/directories/{0}'.format(name)
         method = 'DELETE'
@@ -1049,6 +1114,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_auth_dir')
         result = None
 
         if not self.auth_directories.get(clusteruuid):
@@ -1099,6 +1165,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_auth_dir_role_mappings')
         role_mappings = []
         params = {}
         payload = None
@@ -1126,6 +1193,7 @@ class Config(object):
         :param directory_entity_type: Type of directory entity being added.
         :type directory_entity_type: str('USER', 'GROUP')
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._check_auth_dir_role_mapping_directory_entity_type')
         if directory_entity_type.upper() not in ['GROUP', 'USER']:
             raise ValueError('directory_entity_type has to be set to one of "GROUP", "USER".')
 
@@ -1142,6 +1210,7 @@ class Config(object):
         :returns: Role based on boolean inputs.
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._get_auth_dir_role_mapping_role')
         if user_admin:
             role = 'ROLE_USER_ADMIN'
         elif cluster_admin:
@@ -1158,6 +1227,7 @@ class Config(object):
         :param mapping_role: Type of directory entity being added.
         :type mapping_role: str('ROLE_USER_ADMIN', 'ROLE_CLUSTER_ADMIN', 'ROLE_CLUSTER_VIEWER')
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._check_auth_dir_role_mapping_role')
         if mapping_role.upper() not in ['ROLE_USER_ADMIN', 'ROLE_CLUSTER_ADMIN', 'ROLE_CLUSTER_VIEWER']:
             raise ValueError('directory_entity_type has to be set to one of "ROLE_USER_ADMIN", "ROLE_CLUSTER_ADMIN", "ROLE_CLUSTER_VIEWER".')
 
@@ -1179,6 +1249,7 @@ class Config(object):
         :param user_admin: Whether to grant user `User Admin` privilege
         :type user_admin: bool, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_auth_dir_role_mapping')
         params = {}
         uri = '/authconfig/directories/{0}/role_mappings'.format(directory)
         method = 'POST'
@@ -1215,6 +1286,7 @@ class Config(object):
         :param user_admin: Whether to grant user `User Admin` privilege
         :type user_admin: bool, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_auth_dir_role_mapping')
         params = {}
         uri = '/authconfig/directories/{0}/role_mappings'.format(directory)
         method = 'PUT'
@@ -1252,6 +1324,7 @@ class Config(object):
         :param user_admin: Whether to grant user `User Admin` privilege
         :type user_admin: bool, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_auth_dir_role_mapping')
         params = {}
         uri = '/authconfig/directories/{0}/role_mappings'.format(directory)
         method = 'DELETE'
@@ -1292,6 +1365,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_auth_dir_role_mapping')
         result = None
 
         role = self._get_auth_dir_role_mapping_role(user_admin=user_admin, cluster_admin=cluster_admin)
@@ -1336,6 +1410,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_local_users')
         params = {}
         uri = '/users'
         payload = None
@@ -1353,6 +1428,7 @@ class Config(object):
         :param language: Localization region for user account `(default='en-US')`
         :type language: str('en-US','zh-CN','ja-JP'), optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._check_user_language')
 
         if language not in ['en-US', 'zh-CN', 'ja-JP']:
             raise ValueError('Region has to be set to one of "en-US", "zh-CN", "ja-JP".')
@@ -1370,6 +1446,7 @@ class Config(object):
         :returns: A list of roles.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config._build_role_list')
 
         roles = ['ROLE_CLUSTER_VIEWER']
         roles = []
@@ -1407,6 +1484,7 @@ class Config(object):
         :param enabled: Enable user account `(default=True)`
         :type enabled: bool, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_local_user')
         params = {}
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
@@ -1465,6 +1543,7 @@ class Config(object):
         :param enabled: Enable user account `(default=True)`
         :type enabled: bool, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_local_user')
         params = {}
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
@@ -1505,6 +1584,7 @@ class Config(object):
         :param username: Username
         :type username: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_local_user')
         params = {}
         uri = '/users/{0}'.format(username)
         method = 'DELETE'
@@ -1544,6 +1624,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_local_user')
         result = None
 
         if not self.local_users.get(clusteruuid):
@@ -1587,6 +1668,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_alert_config')
         params = {}
         uri = '/alerts/configuration'
         payload = None
@@ -1615,6 +1697,7 @@ class Config(object):
         :param nutanix_default_email:
         :type nutanix_default_email: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_alert_config')
         params = {}
         uri = '/alerts/configuration'
         method = 'PUT'
@@ -1639,6 +1722,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_alert_config')
         email_list = []
         enable = False
         enable_default = False
@@ -1655,6 +1739,7 @@ class Config(object):
         :returns: A list of authentication config.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_auth_config')
         params = {}
         payload = None
         uri = '/authconfig'
@@ -1675,12 +1760,17 @@ class Config(object):
         :returns: A list of the clusters ntp servers
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_ntp')
         params = {}
         payload = None
         uri = '/cluster/ntp_servers'
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
+
+        if self.ntp_servers.get(clusteruuid):
+            logger.info("cleaning up existing class ntp records")
+            self.ntp_servers.pop(clusteruuid)
 
         self.ntp_servers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.ntp_servers[clusteruuid]
@@ -1694,6 +1784,7 @@ class Config(object):
         :type ntp_server: IP address or hostname for a ntp server
         :type ntp_server: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_ntp')
         params = {}
         uri = '/cluster/ntp_servers'
         method = 'POST'
@@ -1715,6 +1806,7 @@ class Config(object):
         :type ntp_server: IP address or hostname for a ntp server
         :type ntp_server: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_ntp')
         params = {}
         payload = None
         uri = '/cluster/ntp_servers/{0}'.format(ntp_server)
@@ -1737,6 +1829,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_ntp')
         result = None
 
         if not ntp_servers:
@@ -1754,9 +1847,9 @@ class Config(object):
         # If the NTP servers are not in the right order
         elif not collections.Counter(ntp_servers) == collections.Counter(self.ntp_servers.get(clusteruuid)):
             for ntp_server in self.get_ntp(clusteruuid=clusteruuid):
-                self.remove_ntp(ntp_server)
+                self.remove_ntp(ntp_server=ntp_server, clusteruuid=clusteruuid)
             for ntp_server in ntp_servers:
-                self.add_ntp(ntp_server)
+                self.add_ntp(ntp_server=ntp_server, clusteruuid=clusteruuid)
             result = 'updated'
 
         if result:
@@ -1774,12 +1867,17 @@ class Config(object):
         :returns: A list of the clusters dns servers
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_dns')
         params = {}
         payload = None
         uri = '/cluster/name_servers'
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
+
+        if self.dns_servers.get(clusteruuid):
+            logger.info("cleaning up existing class dns records")
+            self.dns_servers.pop(clusteruuid)
 
         self.dns_servers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.dns_servers[clusteruuid]
@@ -1793,6 +1891,7 @@ class Config(object):
         :type dns_server: IP address or hostname for a dns server
         :type dns_server: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_dns')
         params = {}
         uri = '/cluster/name_servers'
         method = 'POST'
@@ -1803,6 +1902,7 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        logger.info("adding dns server '{0}'".format(dns_server))
         self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
 
     def remove_dns(self, dns_server, clusteruuid=None):
@@ -1814,6 +1914,7 @@ class Config(object):
         :type dns_server: IP address or hostname for a dns server
         :type dns_server: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_dns')
         params = {}
         payload = None
         uri = '/cluster/name_servers/{0}'.format(dns_server)
@@ -1822,6 +1923,7 @@ class Config(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        logger.info("removing dns server '{0}'".format(dns_server))
         self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
 
     def set_dns(self, clusteruuid=None, dns_servers=None):
@@ -1836,6 +1938,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_dns')
         result = None
 
         if not dns_servers:
@@ -1844,17 +1947,20 @@ class Config(object):
         if not self.dns_servers.get(clusteruuid):
             self.get_dns(clusteruuid=clusteruuid)
 
+        if len(dns_servers) > 3:
+            raise ValueError('a maximum of 3 dns servers can be set.')
+
         if len(self.dns_servers.get(clusteruuid)) == 0:
             for dns_server in dns_servers:
-                self.add_dns(dns_server)
+                self.add_dns(dns_server, clusteruuid=clusteruuid)
             result = 'added'
 
         elif not collections.Counter(dns_servers) == collections.Counter(self.get_dns(clusteruuid=clusteruuid)):
             for dns_server in self.get_dns(clusteruuid=clusteruuid):
-                self.remove_dns(dns_server)
+                self.remove_dns(dns_server=dns_server, clusteruuid=clusteruuid)
 
             for dns_server in dns_servers:
-                self.add_dns(dns_server)
+                self.add_dns(dns_server, clusteruuid=clusteruuid)
             result = 'updated'
 
         if result:
@@ -1872,6 +1978,7 @@ class Config(object):
         :returns: A list of the clusters dns servers
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_proxy')
         params = {}
         payload = None
         uri = '/http_proxies'
@@ -1901,6 +2008,7 @@ class Config(object):
         :type password: Password to authenticate to the proxy
         :type password: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.add_proxy')
         params = {}
         payload = {
             "address": address,
@@ -1940,6 +2048,7 @@ class Config(object):
         :type password: Password to authenticate to the proxy
         :type password: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.update_proxy')
         params = {}
         payload = {
             "address": address,
@@ -1969,6 +2078,7 @@ class Config(object):
         :type name: Name of proxy server
         :type name: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.remove_proxy')
         params = {}
         payload = None
         uri = '/http_proxies/{0}'.format(name)
@@ -2006,6 +2116,7 @@ class Config(object):
         :returns: `updated` if changed, `added` if created or None otherwise
         :rtype: str
         """
+        logger = logging.getLogger('ntnx_api.prism.Config.set_proxy')
         result = None
 
         if not address:
@@ -2054,6 +2165,37 @@ class Config(object):
 
         return result
 
+    def accept_elua(self, name, title, company, clusteruuid=None):
+        """Accept the Nutanix ELUA
+
+        :param name: Your name
+        :type name: str
+        :param title: Your job title
+        :type title: str
+        :param company: Name of your company
+        :type company: str
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config._get_group_search_type')
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        uri = '/eulas/accept'
+        method = 'POST'
+        payload = {
+            "username": name,
+            "companyName": company,
+            "jobTitle": title
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method)
+
 
 class Cluster(object):
     """A class to represent a Nutanix Cluster
@@ -2063,6 +2205,7 @@ class Cluster(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.Cluster.__init__')
         self.api_client = api_client
         self.clusters = []
         self.cluster = {}
@@ -2077,6 +2220,8 @@ class Cluster(object):
         .. note:: Will return all registered clusters when `connection_type=='pc'`
         .. note:: Will only return one cluster when `connection_type=='pe'`
         """
+        logger = logging.getLogger('ntnx_api.prism.Cluster.get_all_uuids')
+        self.clusters = []
         params = {}
         payload = None
 
@@ -2108,7 +2253,7 @@ class Cluster(object):
                 self.clusters.append(cluster.get('metadata').get('uuid'))
             else:
                 self.clusters.append(cluster.get('uuid'))
-
+        logger.info('found cluster uuids: {0}'.format(self.clusters))
         return self.clusters
 
     def get(self, clusteruuid=None):
@@ -2120,12 +2265,18 @@ class Cluster(object):
         :returns: A dictionary describing the configuration of the cluster.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Cluster.get')
         params = {}
         payload = None
         uri = '/cluster'
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
+
+        # Remove existing data for this cluster if it exists
+        if self.cluster.get(clusteruuid):
+            self.cluster.pop(clusteruuid)
+            logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
 
         self.cluster[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
         return self.cluster
@@ -2142,6 +2293,7 @@ class Cluster(object):
 
         .. note:: Cluster HA configuration will only present for cluster running the AHV hypervisor.
         """
+        logger = logging.getLogger('ntnx_api.prism.Cluster.get_ha')
         params = {}
         payload = None
         uri = '/ha'
@@ -2164,6 +2316,7 @@ class Cluster(object):
         :returns: A dictionary describing the found cluster.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Cluster.search_uuid')
         found = {}
         if not self.clusters:
             self.get(clusteruuid)
@@ -2187,6 +2340,7 @@ class Cluster(object):
         :returns: A dictionary describing the found cluster.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Cluster.search_name')
         found = {}
         if not self.clusters:
             self.get(clusteruuid)
@@ -2207,6 +2361,7 @@ class Hosts(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.Hosts.__init__')
         self.api_client = api_client
         self.hosts = {}
 
@@ -2220,9 +2375,15 @@ class Hosts(object):
         :returns: A list of dictionaries describing each host from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Hosts.get')
         params = {}
         payload = None
         uri = '/hosts'
+
+        # Remove existing data for this cluster if it exists
+        if self.hosts.get(clusteruuid):
+            self.hosts.pop(clusteruuid)
+            logger.info('removing existing data from class dict hosts for cluster {0}'.format(clusteruuid))
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
@@ -2243,6 +2404,7 @@ class Hosts(object):
         :returns: A dictionary describing the found host.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Hosts.search_uuid')
         found = {}
         if not self.hosts.get(clusteruuid):
             self.get(clusteruuid)
@@ -2266,6 +2428,7 @@ class Hosts(object):
         :returns: A dictionary describing the found host.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Hosts.search_name')
         found = {}
         if not self.hosts.get(clusteruuid):
             self.get(clusteruuid)
@@ -2289,6 +2452,7 @@ class Hosts(object):
         :returns: A dictionary describing the found host.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Hosts.search_ip')
         found = {}
         if not self.hosts.get(clusteruuid):
             self.get(clusteruuid)
@@ -2309,6 +2473,7 @@ class Vms(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.Vms.__init__')
         self.api_client = api_client
         self.vms = {}
 
@@ -2322,6 +2487,7 @@ class Vms(object):
         :returns: A list of dictionaries describing each vm from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.Vms.get')
         params = {'include_vm_disk_config': 'true', 'include_vm_nic_config': 'true', 'length': '2147483647'}
         payload = None
         uri = '/vms'
@@ -2329,10 +2495,15 @@ class Vms(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
+        # Remove existing data for this cluster if it exists
+        if self.vms.get(clusteruuid):
+            self.vms.pop(clusteruuid)
+            logger.info('removing existing data from class dict vms for cluster {0}'.format(clusteruuid))
+
         self.vms[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.vms[clusteruuid]
 
-    def search_uuid(self, uuid, clusteruuid=None):
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2344,8 +2515,9 @@ class Vms(object):
         :returns: A dictionary describing the found vm.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Vms.search_uuid')
         found = {}
-        if not self.vms.get(clusteruuid):
+        if not self.vms.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.vms.get(clusteruuid):
@@ -2355,7 +2527,7 @@ class Vms(object):
 
         return found
 
-    def search_name(self, name, clusteruuid=None):
+    def search_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm name
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2367,8 +2539,9 @@ class Vms(object):
         :returns: A dictionary describing the found vm.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Vms.search_name')
         found = {}
-        if not self.vms.get(clusteruuid):
+        if not self.vms.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.vms.get(clusteruuid):
@@ -2387,6 +2560,7 @@ class Images(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.Images.__init__')
         self.api_client = api_client
         self.images = {}
 
@@ -2402,6 +2576,14 @@ class Images(object):
 
         .. note:: Images are only present for cluster running the AHV hypervisor.
         """
+        logger = logging.getLogger('ntnx_api.prism.Images.get')
+        logger.info('starting function to retrieve images from cluster api')
+
+        # Remove existing data for this cluster if it exists
+        if self.images.get(clusteruuid):
+            self.images.pop(clusteruuid)
+            logger.info('removing existing data from class dict images for cluster {0}'.format(clusteruuid))
+
         params = {'length': '2147483647'}
         payload = None
         uri = '/images'
@@ -2412,20 +2594,24 @@ class Images(object):
         self.images[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.images[clusteruuid]
 
-    def search_uuid(self, uuid, clusteruuid=None):
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific image, in a specific cluster by image uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         :param uuid: A image uuid to search for.
-        :type uuid: str, optional
+        :type uuid: str
+        :param refresh: Whether to refresh the data stored in the class prior to performing the search. Defaults to False.
+        :type refresh: bool, optional
 
         :returns: A dictionary describing the found image.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Images.search_uuid')
+        logger.info('starting function to search for image by uuid')
         found = {}
-        if not self.images.get(clusteruuid):
+        if not self.images.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.images.get(clusteruuid):
@@ -2433,22 +2619,31 @@ class Images(object):
                 found = entity
                 break
 
+        if found:
+            logger.info('image found: {0}'.format(found))
+        else:
+            logger.info('image not found: {0}'.format(found))
+
         return found
 
-    def search_name(self, name, clusteruuid=None):
+    def search_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific image, in a specific cluster by image name
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         :param name: A image name to search for.
-        :type name: str, optional
+        :type name: str
+        :param refresh: Whether to refresh the data stored in the class prior to performing the search. Defaults to False.
+        :type refresh: bool, optional
 
         :returns: A dictionary describing the found image.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.Images.search_name')
+        logger.info('starting function to search for image by name')
         found = {}
-        if not self.images.get(clusteruuid):
+        if not self.images.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.images.get(clusteruuid):
@@ -2456,7 +2651,229 @@ class Images(object):
                 found = entity
                 break
 
+        if found:
+            logger.info('image found: {0}'.format(found))
+        else:
+            logger.info('image not found: {0}'.format(found))
+
         return found
+
+    def delete_name(self, name, clusteruuid=None, wait=False):
+        """Delete an existing image based on the image name provided
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: A image name to be deleted.
+        :type name: str
+        :param wait: Wait for the image task to complete. Defaults to False.
+        :type wait: bool, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Images.delete_name')
+        image_search = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        if image_search:
+            logger.info('image {0} found with uuid {1}'.format(name, image_search.get('uuid')))
+            self.delete_uuid(uuid=image_search.get('uuid'), clusteruuid=clusteruuid, wait=wait)
+
+    def delete_uuid(self, uuid, clusteruuid=None, wait=False):
+        """Delete an existing image based on the image uuid provided
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param uuid: A image uuid to be deleted.
+        :type uuid: str
+        :param wait: Wait for the image task to complete. Defaults to False.
+        :type wait: bool, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Images.delete_uuid')
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        uri = '/images/{0}'.format(uuid)
+        method = 'DELETE'
+
+        delete_task = self.api_client.request(uri=uri, api_version='v2.0', params=params, method=method, response_code=200)
+        task_uuid = delete_task.get('task_uuid')
+
+        if wait:
+            task_obj = Task(api_client=self.api_client)
+            thread = threading.Thread(target=task_obj.watch_task(task_uuid=task_uuid, clusteruuid=clusteruuid))
+            thread.start()
+
+            task_obj.task_status.wait()
+            logger.info('image {0} deleted'.format(task_uuid))
+        else:
+            logger.info('task created to delete image {0}'.format(task_uuid))
+
+    def upload_from_url(self, name, url, storage_container_uuid, image_type='disk', annotation='', clusteruuid=None, wait=False):
+        """ Upload an image from a URL. The target URL needs to be accessible from the CVM network on the target Nutanix cluster.
+
+        :param name: A name for the image to be creted.
+        :type name: str
+        :param url: A URL that resolves to the file of the image to be created.
+        :type url: str
+        :param storage_container_uuid: The UUID of the storage container on which to place the image.
+        :type storage_container_uuid: str
+        :param image_type: The type of image to be created. (default=disk).
+        :type image_type: str('disk', 'iso'), optional
+        :param annotation: The annotation to set on the image. (default='').
+        :type annotation: str, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param wait: Wait for the task to complete. (default=false).
+        :type wait: bool, optional
+
+        :return: Result of image upload. If Tur the image was created successfully. If False the image creation was unsuccessful
+        :rtype: Bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Images.upload_from_url')
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if image_type == 'disk':
+            image_type = 'DISK_IMAGE'
+        else:
+            image_type = 'ISO_IMAGE'
+
+        # check image with the same name doesn't already exist
+        image_search = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        if image_search:
+            logger.warning('image with same name "{0}" already exists'.format(name))
+            return False
+
+        else:
+            # begin image creation & upload
+            uri = '/images'
+            method = 'POST'
+            image_spec = {
+                "storage_container_uuid": storage_container_uuid,
+                "url": url
+            }
+            payload = {
+                "annotation": annotation,
+                "image_type": image_type,
+                "name": name,
+                "image_import_spec": image_spec,
+                "storage_container_uuid": storage_container_uuid,
+            }
+
+            upload_task = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=201)
+            upload_task_uuid = upload_task.get('task_uuid')
+
+            if wait:
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=upload_task_uuid, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[upload_task_uuid].get('progress_status').lower() == 'succeeded':
+                    logger.info('image upload successful')
+                    return True
+                else:
+                    logger.warning('image upload failed')
+
+                    # clean up failed image
+                    for image in task_obj.task_result[upload_task_uuid].get('entity_list'):
+                        self.delete_uuid(uuid=image.get('entity_id'), clusteruuid=None)
+                    return False
+
+            else:
+                logger.info('task created to upload image {0}'.format(upload_task_uuid))
+
+    def upload_from_file(self, name, file_path, storage_container_uuid, image_type='DISK_IMAGE', annotation='', clusteruuid=None, wait=False):
+        """ Upload an image from a file path. The target file path needs to be accessible on the device running this script.
+
+        :param name: A name for the image to be creted.
+        :type name: str
+        :param file_path: A file path that resolves to the file of the image to be created.
+        :type file_path: str
+        :param storage_container_uuid: The UUID of the storage container on which to place the image.
+        :type storage_container_uuid: str
+        :param image_type: The type of image to be created. (default=disk).
+        :type image_type: str('disk', 'iso'), optional
+        :param annotation: The annotation to set on the image. (default='').
+        :type annotation: str, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param wait: Wait for the task to complete. (default=false).
+        :type wait: bool, optional
+
+        :return: Result of image upload. If Tur the image was created successfully. If False the image creation was unsuccessful
+        :rtype: Bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Images.upload_from_file')
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        # check image with the same name doesn't already exist
+        image_search = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        if image_search:
+            logger.warning('image with same name "{0}" already exists'.format(name))
+            return False
+        else:
+            # begin image creation & upload
+            uri = '/images'
+            method = 'POST'
+            payload = {
+                "annotation": annotation,
+                "image_type": image_type,
+                "name": name,
+                "storage_container_uuid": storage_container_uuid,
+            }
+
+            create_image_task = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=201)
+            create_image_task_uuid = create_image_task.get('task_uuid')
+
+            task_obj = Task(api_client=self.api_client)
+            thread = threading.Thread(target=task_obj.watch_task(task_uuid=create_image_task_uuid, clusteruuid=clusteruuid))
+            thread.start()
+            task_obj.task_status.wait()
+
+            image = self.search_name(name=name, refresh=True, clusteruuid=clusteruuid)
+            logger.info('image found: {0}'.format(image))
+            if image:
+                logger.info('starting image upload')
+                image_uuid = image.get('uuid')
+
+                uri = '/images/{0}/upload'.format(image_uuid)
+                method = 'PUT'
+                header_dict = {'X-Nutanix-Destination-Container': storage_container_uuid}
+                image_upload_task = self.api_client.upload(uri=uri, file_path=file_path, header_dict=header_dict, api_version='v0.8',
+                                                           params=params, method=method, response_code=200, timeout=600)
+
+                upload_task_uuid = image_upload_task.get('task_uuid')
+                logger.info('Task {0}'.format(image_upload_task))
+
+                if wait:
+                    task_obj = Task(api_client=self.api_client)
+                    thread = threading.Thread(target=task_obj.watch_task(task_uuid=upload_task_uuid, clusteruuid=clusteruuid))
+                    thread.start()
+
+                    task_obj.task_status.wait()
+                    if task_obj.task_result[upload_task_uuid].get('progress_status').lower() == 'succeeded':
+                        logger.info('image upload successful')
+                        return True
+                    else:
+                        logger.warning('image upload failed')
+
+                        # clean up failed image
+                        for image in task_obj.task_result[upload_task_uuid].get('entity_list'):
+                            self.delete_uuid(uuid=image.get('entity_id'), clusteruuid=None)
+                        return False
+
+                else:
+                    logger.info('task created to upload image {0}'.format(upload_task_uuid))
+                    return True
+
+            else:
+                logger.error('image not found for upload')
+                return False
 
 
 class StorageContainer(object):
@@ -2467,6 +2884,7 @@ class StorageContainer(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.__init__')
         self.api_client = api_client
         self.storage_containers = {}
 
@@ -2480,6 +2898,13 @@ class StorageContainer(object):
         :returns: A list of dictionaries describing each container from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.get')
+
+        # Remove existing data for this cluster if it exists
+        if self.storage_containers.get(clusteruuid):
+            self.storage_containers.pop(clusteruuid)
+            logger.info('removing existing data from class dict storage_containers for cluster {0}'.format(clusteruuid))
+
         params = {'count': '2147483647'}
         payload = None
         uri = '/storage_containers'
@@ -2490,7 +2915,7 @@ class StorageContainer(object):
         self.storage_containers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.storage_containers[clusteruuid]
 
-    def search_uuid(self, uuid, clusteruuid=None):
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific container, in a specific cluster by container uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2501,8 +2926,9 @@ class StorageContainer(object):
         :returns: A dictionary describing the found container.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_uuid')
         found = {}
-        if not self.storage_containers.get(clusteruuid):
+        if not self.storage_containers.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.storage_containers.get(clusteruuid):
@@ -2512,7 +2938,7 @@ class StorageContainer(object):
 
         return found
 
-    def search_name(self, name, clusteruuid=None):
+    def search_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific container, in a specific cluster by container uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2524,8 +2950,9 @@ class StorageContainer(object):
         :returns: A dictionary describing the found container.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_name')
         found = {}
-        if not self.storage_containers.get(clusteruuid):
+        if not self.storage_containers.get(clusteruuid) or refresh:
             self.get(clusteruuid)
 
         for entity in self.storage_containers.get(clusteruuid):
@@ -2544,6 +2971,7 @@ class StorageVolume(object):
     """
 
     def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.__init__')
         self.api_client = api_client
         self.volume_groups = {}
         self.volumes = {}
@@ -2555,6 +2983,7 @@ class StorageVolume(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.get')
         self.get_volume_groups(clusteruuid)
         self.get_volumes(clusteruuid)
 
@@ -2568,6 +2997,13 @@ class StorageVolume(object):
         :returns: A list of dictionaries describing each volume group from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.get_volume_groups')
+
+        # Remove existing data for this cluster if it exists
+        if self.volume_groups.get(clusteruuid):
+            self.volume_groups.pop(clusteruuid)
+            logger.info('removing existing data from class dict volume_groups for cluster {0}'.format(clusteruuid))
+
         params = {}
         payload = None
         uri = '/volume_groups'
@@ -2578,7 +3014,7 @@ class StorageVolume(object):
         self.volume_groups[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.volume_groups[clusteruuid]
 
-    def search_volume_groups_uuid(self, uuid, clusteruuid=None):
+    def search_volume_groups_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific volume group, in a specific cluster by volume group uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2590,8 +3026,10 @@ class StorageVolume(object):
         :returns: A dictionary describing the found volume group.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.search_volume_groups_uuid')
         found = {}
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
+            logger.info('retreving volume group dataset from API')
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
@@ -2601,7 +3039,7 @@ class StorageVolume(object):
 
         return found
 
-    def search_volume_groups_name(self, name, clusteruuid=None):
+    def search_volume_groups_name(self, name, clusteruuid=None, refresh=False):
         """Retrieve data for a specific volume group, in a specific cluster by volume group uuid
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2612,8 +3050,9 @@ class StorageVolume(object):
         :returns: A dictionary describing the found volume group.
         :rtype: ResponseDict
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.search_volume_groups_name')
         found = {}
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
@@ -2623,7 +3062,7 @@ class StorageVolume(object):
 
         return found
 
-    def get_volumes(self, clusteruuid=None):
+    def get_volumes(self, clusteruuid=None, refresh=False):
         """Retrieve data for each volume in a specific cluster
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
@@ -2633,9 +3072,16 @@ class StorageVolume(object):
         :returns: A list of dictionaries describing each volume group from the specified cluster.
         :rtype: ResponseList
         """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.get_volumes')
+
+        # Remove existing data for this cluster if it exists
+        if self.volumes.get(clusteruuid):
+            self.volumes.pop(clusteruuid)
+            logger.info('removing existing data from class dict volumes for cluster {0}'.format(clusteruuid))
+
         result = []
 
-        if not self.volume_groups.get(clusteruuid):
+        if not self.volume_groups.get(clusteruuid) or refresh:
             self.get_volume_groups(clusteruuid)
 
         for entity in self.volume_groups.get(clusteruuid):
@@ -2645,5 +3091,71 @@ class StorageVolume(object):
             }
             result.append(volumes)
 
-        self.volumes = result
-        return self.volumes
+        self.volumes[clusteruuid] = result
+        return self.volumes[clusteruuid]
+
+
+class Task(object):
+    """A class to represent a Nutanix Clusters Task object.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+
+    def __init__(self, api_client):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.Task.__init__')
+        self.api_client = api_client
+        self.task_status = threading.Event()
+        self.task_result = {}
+
+    def get_task(self, task_uuid, clusteruuid=None):
+        """Retrieves a specific task based on provided uuid
+
+        :param task_uuid: The uuid of the task
+        :type task_uuid: str
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+
+        :returns: A dictionaries describing the specified task.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.Task.get_task')
+        params = {}
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        uri = '/tasks/{0}'.format(task_uuid)
+        method = 'GET'
+        payload = {}
+
+        return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
+
+    def watch_task(self, task_uuid, clusteruuid=None, max_refresh_secs=60):
+        """Watches a specific task based until it finishes. Updates task status in ResponseList self.task_result within the class
+
+        :param task_uuid: The uuid of the task
+        :type task_uuid: str
+        :param max_refresh_secs: The maximum number of seconds to wait before checking the status of the task. Actual wait time is randomized. (default=60)
+        :type max_refresh_secs: int, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Task.watch_task_thread')
+        task_status = None
+        task_complete = False
+        while not task_complete:
+            time.sleep(random() * max_refresh_secs)
+            task_status = self.get_task(task_uuid=task_uuid, clusteruuid=clusteruuid)
+            if not task_status.get('progress_status').lower() in ['queued', 'running', 'none']:
+                task_complete = True
+                logger.info('task {0} finished'.format(task_uuid))
+                logger.debug('task {0} details {1}'.format(task_uuid, task_status))
+            else:
+                logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('progress_status').lower()))
+        self.task_result[task_uuid] = task_status
+        self.task_status.set()
