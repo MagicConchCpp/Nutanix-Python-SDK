@@ -46,7 +46,6 @@ DOCUMENTATION = r'''
 EXAMPLES = r'''
 '''
 
-
 # Setup logging
 logger = logging.getLogger('ntnx_api.client')
 logging.config.dictConfig({
@@ -59,8 +58,8 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.client': {
-            'level':'INFO',
-            'class':'logging.StreamHandler',
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"
         },
@@ -131,10 +130,10 @@ class NutanixRestHTTPError(NutanixError):
                "version {1} at {2}:\nhttp params: {3}\nhttp body: {4}\n{5}\n{6}")
         return msg.format(self.code, self.rest_version, self.target, self.params, self.data, self.reason, self.text)
 
+
 @deprecated(
-    reason="""
-    Thi ApiClient class is being depcreated in favor of seperate classes for teach Nutanix endpoint type being connected with. This will simplify future 
-    development and use and allow for more granular changes based on the requirements of the endpoints API.
+    reason="""This ApiClient class is being deprecated in favor of separate classes for teach Nutanix endpoint type being connected with. This will simplify
+    future development and use and allow for more granular changes based on the requirements of the endpoints API.
 
        - Prism API connection management has moved to client.Prism
     """,
@@ -525,7 +524,6 @@ class PrismApi(object):
             logger.debug('api response code: {0}'.format(response.status_code))
             logger.debug('api response: {0}'.format(response.json()))
 
-
         except requests.exceptions.HTTPError:
             raise NutanixRestHTTPError(request_url, str(api_version), json.dumps(payload), params, response)
 
@@ -638,4 +636,3 @@ class PrismApi(object):
         else:
             logger.error('logon failed')
             return False
-
