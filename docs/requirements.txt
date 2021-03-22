@@ -2,4 +2,3 @@ urllib3
 requests
 paramiko
 deprecated
-logging

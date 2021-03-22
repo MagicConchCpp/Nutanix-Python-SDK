@@ -7,7 +7,8 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
-    "1.1.3", "3/19/2021", "Re-ordered changelog to improve readability. Added Config.accept_elua
+    "1.1.5", "3/22/2021", "Removed logging from requirements.txt"
+    "1.1.3", "3/19/2021", "Re-ordered changelog to improve readability. Added Config.accept_elua"
     "1.1.2", "3/19/2021", "Fix to ensure that class variables holding data are cleaned up prior to be refreshed."
     "1.1.1", "3/19/2021", "Added new PrismApi class to client.py to replace existing ApiClient class. Added console logged for enhanced troubleshooting. Added Image upload from URL & file. Added task monitoring to support image upload completion tracking."
     "1.0.1", "10/20/2020", "For all set_* functions in ntnx_api.prism updated the return value to indicate whether a record has been added or updated."
