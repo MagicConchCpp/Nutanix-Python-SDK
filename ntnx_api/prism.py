@@ -2181,7 +2181,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
-        logger = logging.getLogger('ntnx_api.prism.Config._get_group_search_type')
+        logger = logging.getLogger('ntnx_api.prism.Config.accept_elua')
         params = {}
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
