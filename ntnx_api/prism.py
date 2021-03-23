@@ -2199,19 +2199,23 @@ class Config(object):
 
         self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method)
 
-    def change_admin_password(self, admin_password, ssh_user='nutanix', ssh_password='nutanix/4u', clusteruuid=None):
+    def change_ui_admin_password(self, admin_password, ssh_user='nutanix', ssh_password='nutanix/4u', clusteruuid=None):
         """Change the password for the 'admin' UI user account. This is not exposed via the API so paramiko is used to establish an ssh session to the CVM.
         If ssh is blocked or key-based authentication is enabled (cluster-lockdown) then this will not work.
 
-        :param password: Your name
-        :type password: str
+        :param admin_password: The new admin password to be set for the prism admin user account. See https://portal.nutanix.com for password complexity requirements.
+        :type admin_password: str
+        :param ssh_user: The user with ssh access to the nutanix cluster (default='nutanix')
+        :type ssh_password: str, optional
+        :param ssh_password: The password for the user with ssh access to the nutanix cluster (default='nutanix/4u')
+        :type ssh_password: str, optional
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
         logger = logging.getLogger('ntnx_api.prism.Config.change_admin_password')
 
-        command = 'ncli user reset-password user-name="admin" password="{0}"'.format(password)
+        command = 'ncli user reset-password user-name="admin" password="{0}"'.format(admin_password)
         port = 22
         host_list = []
 
