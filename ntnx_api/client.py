@@ -33,8 +33,7 @@ import json
 import logging
 import logging.config
 
-DOCUMENTATION = """
-name: nutanix_api.client
+DOCUMENTATION = """name: nutanix_api.client
 author: 
     - Ross Davies <davies.ross@gmail.com>
 short_description: Connect to the Nutanix Prism v2 or v3 API and return data
@@ -140,7 +139,6 @@ class NutanixRestHTTPError(NutanixError):
 @deprecated(
     reason="""This ApiClient class is being deprecated in favor of separate classes for teach Nutanix endpoint type being connected with. This will simplify
     future development and use and allow for more granular changes based on the requirements of the endpoints API. 
-    
     Prism Element or Central API connection management has moved to :class:`.PrismApi`
     """,
     version='1.1.0',
@@ -357,7 +355,8 @@ class ApiClient(object):
 
 @versionadded(
     reason="""
-    This class supersedes the originally released class :class:`.ApiClient`. To interact with the Prism Element or Prism Central APIs please use this class instead of the deprecated class.
+    This class supersedes the originally released class :class:`.ApiClient`. 
+    To interact with the Prism Element or Prism Central APIs please use this class instead of the deprecated class.
     """,
     version='1.1.0',
 )
