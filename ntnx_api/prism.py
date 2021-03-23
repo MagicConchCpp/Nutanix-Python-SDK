@@ -2178,7 +2178,7 @@ class Config(object):
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
         """
-        logger = logging.getLogger('ntnx_api.prism.Config._get_group_search_type')
+        logger = logging.getLogger('ntnx_api.prism.Config.accept_elua')
         params = {}
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
@@ -2195,6 +2195,40 @@ class Config(object):
             params['proxyClusterUuid'] = clusteruuid
 
         self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method)
+
+    def change_ui_admin_password(self, admin_password, ssh_user='nutanix', ssh_password='nutanix/4u', clusteruuid=None):
+        """Change the password for the 'admin' UI user account. This is not exposed via the API so paramiko is used to establish an ssh session to the CVM.
+        If ssh is blocked or key-based authentication is enabled (cluster-lockdown) then this will not work.
+
+        :param admin_password: The new admin password to be set for the prism admin user account. See https://portal.nutanix.com for password complexity requirements.
+        :type admin_password: str
+        :param ssh_user: The user with ssh access to the nutanix cluster (default='nutanix')
+        :type ssh_password: str, optional
+        :param ssh_password: The password for the user with ssh access to the nutanix cluster (default='nutanix/4u')
+        :type ssh_password: str, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config.change_admin_password')
+
+        command = 'ncli user reset-password user-name="admin" password="{0}"'.format(admin_password)
+        port = 22
+        host_list = []
+
+        if clusteruuid:
+            cluster_obj = Cluster(api_client=self.api_client)
+            host_list.append(cluster_obj.get(clusteruuid=clusteruuid).get('cluster_external_address').get('ipv4'))
+        else:
+            host_list.append(self.api_client.ip_address)
+
+        for host in host_list:
+            logger.info('changing UI admin password for cluster "{0}"'.format(host))
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(host, port, ssh_user, ssh_password)
+            stdin, stdout, stderr = ssh.exec_command(command)
+            logger.debug(stdout.readlines())
 
 
 class Cluster(object):
