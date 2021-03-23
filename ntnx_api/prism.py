@@ -2199,6 +2199,36 @@ class Config(object):
 
         self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method)
 
+    def change_admin_password(self, admin_password, ssh_user='nutanix', ssh_password='nutanix/4u', clusteruuid=None):
+        """Change the password for the 'admin' UI user account. This is not exposed via the API so paramiko is used to establish an ssh session to the CVM.
+        If ssh is blocked or key-based authentication is enabled (cluster-lockdown) then this will not work.
+
+        :param password: Your name
+        :type password: str
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config.change_admin_password')
+
+        command = 'ncli user reset-password user-name="admin" password="{0}"'.format(password)
+        port = 22
+        host_list = []
+
+        if clusteruuid:
+            cluster_obj = Cluster(api_client=self.api_client)
+            host_list.append(cluster_obj.get(clusteruuid=clusteruuid).get('cluster_external_address').get('ipv4'))
+        else:
+            host_list.append(self.api_client.ip_address)
+
+        for host in host_list:
+            logger.info('changing UI admin password for cluster "{0}"'.format(host))
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(host, port, ssh_user, ssh_password)
+            stdin, stdout, stderr = ssh.exec_command(command)
+            logger.debug(stdout.readlines())
+
 
 class Cluster(object):
     """A class to represent a Nutanix Cluster

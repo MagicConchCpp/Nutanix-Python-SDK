@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.10", "3/22/2021", "Resolved issue with logging text for prism.Config.accept_eula. Added function to change prism admin password."
     "1.1.9", "3/22/2021", "Resolved issue with default http code return in ntnx_api.client.PrismApi"
     "1.1.8", "3/22/2021", "Ignored flake8 check C901"
     "1.1.7", "3/22/2021", "Separated prism tests into more a more logical structure. Resolved issues with NTP & DNS functions."
