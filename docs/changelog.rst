@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.12", "3/23/2021", "Updated docsctings within for client.py"
     "1.1.11", "3/22/2021", "Added docstring for prism.Config.change_ui_admin_password"
     "1.1.10", "3/22/2021", "Resolved issue with logging text for prism.Config.accept_eula. Added function to change prism admin password."
     "1.1.9", "3/22/2021", "Resolved issue with default http code return in ntnx_api.client.PrismApi"

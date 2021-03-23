@@ -30,7 +30,8 @@ From the root directory of the repo
 
 Changes
 =========
-See the project change log section in the documentation at https://nutanix-api-library.readthedocs.io/en/latest/changelog.html
+The originally released ntnx.api.client.ApiClient class has been deprecated and can be easily replaced with ntnx.api.client.PrismApi.
+See the project change log section within the documentation at https://nutanix-api-library.readthedocs.io/en/latest/changelog.html
 
 Files
 =====
