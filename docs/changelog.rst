@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.14", "3/25/2021", "Added the ability to search for and return host/vm project & categories."
     "1.1.13", "3/23/2021", "Resolved code quality issues in client.py"
     "1.1.12", "3/23/2021", "Updated docsctings within for client.py"
     "1.1.11", "3/22/2021", "Added docstring for prism.Config.change_ui_admin_password"
