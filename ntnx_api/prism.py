@@ -2565,18 +2565,33 @@ class Vms(object):
         self.api_client = api_client
         self.vms = {}
 
-    def get(self, clusteruuid=None):
+    def get(self, clusteruuid=None, include_disks=True, include_nics=True):
         """Retrieve host data for each virtual machine in a specific cluster
 
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
+        :param include_disks: Include VM disk info in returned data (Default=False)
+        :type include_disks: bool, optional
+        :param include_nics: Include VM nic info in returned data (Default=False)
+        :type include_nics: bool, optional
 
         :returns: A list of dictionaries describing each vm from the specified cluster.
         :rtype: ResponseList
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.get')
-        params = {'include_vm_disk_config': 'true', 'include_vm_nic_config': 'true', 'length': '2147483647'}
+        params = {'length': '2147483647'}
+
+        if include_disks:
+            params['include_vm_disk_config'] = 'true'
+        else:
+            params['include_vm_disk_config'] = 'false'
+
+        if include_nics:
+            params['include_vm_nic_config'] = 'true'
+        else:
+            params['include_vm_nic_config'] = 'false'
+
         payload = None
         uri = '/vms'
 

@@ -1,1 +1,1 @@
-from ._version import __version__
+from ntnx_api._version import __version__

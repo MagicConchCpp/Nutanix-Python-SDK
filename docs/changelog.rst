@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.16", "3/26/2021", "Changed version import in __init.py__ to be absolute. Modified Vm.get to allow for conditional return of both VM disks and VM nics."
     "1.1.15", "3/25/2021", "Fixed inconsistency between master& develop branches"
     "1.1.14", "3/25/2021", "Added the ability to search for and return host/vm project & categories."
     "1.1.13", "3/23/2021", "Resolved code quality issues in client.py"
