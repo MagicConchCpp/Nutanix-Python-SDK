@@ -2299,6 +2299,9 @@ class Cluster(object):
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
+        :param refresh: Refresh data for this cluster if it already exists.
+        :type refresh: bool, optional
+
         :returns: A dictionary describing the configuration of the cluster.
         :rtype: ResponseDict
         """
@@ -2306,22 +2309,27 @@ class Cluster(object):
         params = {}
         payload = None
         uri = '/cluster'
-
-        # Remove existing data for this cluster if it exists
-        if self.cluster.get(clusteruuid):
-            self.cluster.pop(clusteruuid)
-            logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
+        result = {}
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
         # Remove existing data for this cluster if it exists
-        if self.cluster.get(clusteruuid):
-            self.cluster.pop(clusteruuid)
-            logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
+        if refresh:
+            if self.cluster.get(clusteruuid):
+                self.cluster.pop(clusteruuid)
+                logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
+            result = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
+            self.cluster[clusteruuid] = result
 
-        self.cluster[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
-        return self.cluster[clusteruuid]
+        elif not self.cluster.get(clusteruuid):
+            result = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
+            self.cluster[clusteruuid] = result
+
+        else:
+            result = self.cluster.get(clusteruuid)
+
+        return result
 
     def get_ha(self, clusteruuid=None):
         """Retrieve HA data for a specific cluster
