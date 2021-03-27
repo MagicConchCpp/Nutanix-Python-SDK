@@ -2321,7 +2321,7 @@ class Cluster(object):
             logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
 
         self.cluster[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
-        return self.cluster
+        return self.cluster[clusteruuid]
 
     def get_ha(self, clusteruuid=None):
         """Retrieve HA data for a specific cluster
