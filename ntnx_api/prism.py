@@ -164,7 +164,11 @@ class Config(object):
 
         if self.api_client.connection_type == "pc":
             uri = '/categories/list'
-            payload = '{ "kind":"category", "offset": 0, "length": 2147483647  }'
+            payload = {
+                "kind": "category",
+                "offset": 0,
+                "length": 2147483647
+            }
             self.categories = self.api_client.request(uri=uri, payload=payload, params=params).get(
                 'entities')
 
@@ -187,7 +191,11 @@ class Config(object):
 
         if self.api_client.connection_type == "pc":
             uri = '/categories/{0}/list'.format(category)
-            payload = '{ "kind":"category", "offset": 0, "length": 2147483647  }'
+            payload = {
+                "kind": "category",
+                "offset": 0,
+                "length": 2147483647
+            }
             self.category_keys = self.api_client.request(uri=uri, payload=payload, params=params).get(
                 'entities')
 
@@ -254,7 +262,11 @@ class Config(object):
 
         if self.api_client == "pc":
             uri = '/projects/list'
-            payload = '{ "kind":"project", "offset": 0, "length": 2147483647  }'
+            payload = {
+                "kind": "project",
+                "offset": 0,
+                "length": 2147483647
+            }
             self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get(
                 'entities')
 
@@ -278,7 +290,11 @@ class Config(object):
 
         if self.api_client == "pc":
             uri = '/vms/list'
-            payload = '{"kind": "vm", "offset": 0, "length": 2147483647 }'
+            payload = {
+                "kind": "vm",
+                "offset": 0,
+                "length": 2147483647
+            }
             vms = self.api_client.request(uri=uri, payload=payload, params=params)
 
             for vm in vms:
@@ -2316,6 +2332,7 @@ class Cluster(object):
 
         # Remove existing data for this cluster if it exists
         if refresh:
+            logger.info('refresh selected')
             if self.cluster.get(clusteruuid):
                 self.cluster.pop(clusteruuid)
                 logger.info('removing existing data from class dict cluster for cluster {0}'.format(clusteruuid))
@@ -2323,10 +2340,12 @@ class Cluster(object):
             self.cluster[clusteruuid] = result
 
         elif not self.cluster.get(clusteruuid):
+            logger.info('no existing data. getting cluster data from api.')
             result = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params)
             self.cluster[clusteruuid] = result
 
         else:
+            logger.info('using existing data')
             result = self.cluster.get(clusteruuid)
 
         return result
