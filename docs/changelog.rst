@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.20", "3/30/2021", "Resolved issues with metadata functions. Renamed variables in vms tests."
     "1.1.19", "3/30/2021", "Updated *.get_project and *.get_categories. Added prism.Vm.get_metadata and prism.Host.get_metadata."
     "1.1.18", "3/26/2021", "Resolved issue payload dict config with prism.Config.*_categories and prism.Config.*_projects"
     "1.1.17", "3/26/2021", "Resolved issue with the returned value from prism.Cluster.get"

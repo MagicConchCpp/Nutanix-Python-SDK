@@ -2433,7 +2433,7 @@ class Hosts(object):
         logger = logging.getLogger('ntnx_api.prism.Hosts.__init__')
         self.api_client = api_client
         self.hosts = {}
-        self.hosts_metadata = {}
+        self.metadata = {}
 
     def get(self, clusteruuid=None):
         """Retrieve data for each host in a specific cluster
@@ -2477,15 +2477,15 @@ class Hosts(object):
 
         if self.api_client.connection_type == "pc":
             # Remove existing data for this cluster if it exists
-            if self.hosts_metadata or refresh:
-                self.hosts_metadata = {}
+            if not self.metadata or refresh:
+                self.metadata = {}
                 logger.info('removing existing data from class dict hosts_metadata')
 
                 hosts = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
                 for host in hosts:
-                    self.hosts_metadata[host.get('metadata').get('uuid')] = host.get('metadata')
+                    self.metadata[host.get('metadata').get('uuid')] = host.get('metadata')
 
-        return self.hosts_metadata
+        return self.metadata
 
     def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific host, in a specific cluster by host uuid
@@ -2577,11 +2577,11 @@ class Hosts(object):
         logger = logging.getLogger('ntnx_api.prism.Hosts.get_project')
         project = ''
         if self.api_client.connection_type == "pc":
-            metadata = self.get_metadata(refresh=refresh)
-            vm_metadata = next((item for item in metadata if item['uuid'] == uuid), None)
-            if vm_metadata:
-                if vm_metadata.get('project_reference').get('kind') == 'project':
-                    project = vm_metadata.get('project_reference').get('name')
+            self.get_metadata(refresh=refresh)
+            metadata = self.hosts_metadata.get(uuid)
+            if metadata:
+                if metadata.get('project_reference').get('kind') == 'project':
+                    project = metadata.get('project_reference').get('name')
         return project
 
     def get_categories(self, uuid, refresh=False):
@@ -2598,11 +2598,11 @@ class Hosts(object):
         logger = logging.getLogger('ntnx_api.prism.Hosts.get_categories')
         categories = {}
         if self.api_client.connection_type == "pc":
-            metadata = self.get_metadata(refresh=refresh)
-            vm_metadata = next((item for item in metadata if item['uuid'] == uuid), None)
-            if vm_metadata:
-                if 'categories' in vm_metadata:
-                    for key, value in vm_metadata.get('categories').items():
+            self.get_metadata(refresh=refresh)
+            metadata = self.hosts_metadata.get(uuid)
+            if metadata:
+                if 'categories' in metadata:
+                    for key, value in metadata.get('categories').items():
                         categories[key] = value
         return categories
 
@@ -2618,7 +2618,7 @@ class Vms(object):
         logger = logging.getLogger('ntnx_api.prism.Vms.__init__')
         self.api_client = api_client
         self.vms = {}
-        self.vms_metadata = {}
+        self.metadata = {}
 
     def get(self, clusteruuid=None, include_disks=True, include_nics=True):
         """Retrieve host data for each virtual machine in a specific cluster
@@ -2677,15 +2677,16 @@ class Vms(object):
 
         if self.api_client.connection_type == "pc":
             # Remove existing data for this cluster if it exists
-            if self.vms_metadata or refresh:
-                self.vms_metadata = {}
+            if not self.metadata or refresh:
+                self.metadata = {}
                 logger.info('removing existing data from class dict vms_metadata')
 
                 vms = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
+                logger.info('returned data: {0}'.format(vms))
                 for vm in vms:
-                    self.vms_metadata[vm.get('metadata').get('uuid')] = vm.get('metadata')
+                    self.metadata[vm.get('metadata').get('uuid')] = vm.get('metadata')
 
-        return self.vms_metadata
+        return self.metadata
 
     def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm uuid
@@ -2753,11 +2754,11 @@ class Vms(object):
         logger = logging.getLogger('ntnx_api.prism.Vms.get_project')
         project = ''
         if self.api_client.connection_type == "pc":
-            metadata = self.get_metadata(refresh=refresh)
-            vm_metadata = next((item for item in metadata if item['uuid'] == uuid), None)
-            if vm_metadata:
-                if vm_metadata.get('project_reference').get('kind') == 'project':
-                    project = vm_metadata.get('project_reference').get('name')
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                if metadata.get('project_reference').get('kind') == 'project':
+                    project = metadata.get('project_reference').get('name')
         return project
 
     def get_categories(self, uuid, refresh=False):
@@ -2774,11 +2775,11 @@ class Vms(object):
         logger = logging.getLogger('ntnx_api.prism.Vms.get_categories')
         categories = {}
         if self.api_client.connection_type == "pc":
-            metadata = self.get_metadata(refresh=refresh)
-            vm_metadata = next((item for item in metadata if item['uuid'] == uuid), None)
-            if vm_metadata:
-                if 'categories' in vm_metadata:
-                    for key, value in vm_metadata.get('categories').items():
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                if 'categories' in metadata:
+                    for key, value in metadata.get('categories').items():
                         categories[key] = value
         return categories
 

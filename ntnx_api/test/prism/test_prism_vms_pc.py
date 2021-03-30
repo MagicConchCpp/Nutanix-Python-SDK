@@ -14,8 +14,8 @@ def test_return_vm_list():
     vms_obj = prism.Vms(api_client=_api())
     clusters = cluster_obj.get_all_uuids()
     for each_uuid in clusters:
-        host = vms_obj.get(clusteruuid=each_uuid)
-        if host:
+        vms = vms_obj.get(clusteruuid=each_uuid)
+        if vms:
             result = True
 
     assert result
