@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.19", "3/30/2021", "Updated *.get_project and *.get_categories. Added prism.Vm.get_metadata and prism.Host.get_metadata."
     "1.1.18", "3/26/2021", "Resolved issue payload dict config with prism.Config.*_categories and prism.Config.*_projects"
     "1.1.17", "3/26/2021", "Resolved issue with the returned value from prism.Cluster.get"
     "1.1.16", "3/26/2021", "Changed version import in __init.py__ to be absolute. Modified Vm.get to allow for conditional return of both VM disks and VM nics."
