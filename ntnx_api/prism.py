@@ -269,8 +269,7 @@ class Config(object):
                 "offset": 0,
                 "length": 2147483647
             }
-            self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get(
-                'entities')
+            self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
 
         else:
             # pe does not expose project data
@@ -2292,7 +2291,7 @@ class Cluster(object):
             uri = '/clusters'
 
         clusters = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
-
+        logger.debug('returned clusters: {0}'.format(clusters))
         # Only return PE clusters ie. exclude any clusters defined as MULTICLUSTER or where the cluster name is not set
         cluster_list = []
         if self.api_client.connection_type == "pc":
