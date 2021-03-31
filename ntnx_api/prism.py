@@ -2291,11 +2291,11 @@ class Cluster(object):
             uri = '/clusters'
 
         clusters = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
-        logger.debug('returned clusters: {0}'.format(clusters))
         # Only return PE clusters ie. exclude any clusters defined as MULTICLUSTER or where the cluster name is not set
         cluster_list = []
         if self.api_client.connection_type == "pc":
             for cluster in clusters:
+                logger.info('returned cluster: {0}'.format(cluster))
                 if "PRISM_CENTRAL" not in cluster.get('status').get('resources').get('config').get('service_list') or \
                         cluster.get('status').get('name') != 'Unnamed':
                     cluster_list.append(cluster)
