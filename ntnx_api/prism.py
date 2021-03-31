@@ -2481,7 +2481,7 @@ class Hosts(object):
             # Remove existing data for this cluster if it exists
             if not self.metadata or refresh:
                 self.metadata = {}
-                logger.info('removing existing data from class dict hosts_metadata')
+                logger.info('removing existing data from class dict metadata')
 
                 hosts = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
                 for host in hosts:
@@ -2580,7 +2580,7 @@ class Hosts(object):
         project = ''
         if self.api_client.connection_type == "pc":
             self.get_metadata(refresh=refresh)
-            metadata = self.hosts_metadata.get(uuid)
+            metadata = self.metadata.get(uuid)
             if metadata:
                 if metadata.get('project_reference').get('kind') == 'project':
                     project = metadata.get('project_reference').get('name')
@@ -2601,7 +2601,7 @@ class Hosts(object):
         categories = {}
         if self.api_client.connection_type == "pc":
             self.get_metadata(refresh=refresh)
-            metadata = self.hosts_metadata.get(uuid)
+            metadata = self.metadata.get(uuid)
             if metadata:
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
@@ -2681,7 +2681,7 @@ class Vms(object):
             # Remove existing data for this cluster if it exists
             if not self.metadata or refresh:
                 self.metadata = {}
-                logger.info('removing existing data from class dict vms_metadata')
+                logger.info('removing existing data from class dict metadata')
 
                 vms = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
                 logger.info('returned data: {0}'.format(vms))
