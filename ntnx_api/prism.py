@@ -51,6 +51,7 @@ import time
 from random import random
 import threading
 import paramiko
+import os
 
 __metaclass__ = type
 
@@ -84,6 +85,7 @@ EXAMPLES = r'''
 
 # Setup logging
 logger = logging.getLogger('ntnx_api.client')
+logging_level = os.environ.get('NTNX_API_LOG_LEVEL', 'WARNING').upper()
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,  # this fixes the problem
@@ -94,7 +96,7 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.prism': {
-            'level':'INFO',
+            'level':logging_level,
             'class':'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"
