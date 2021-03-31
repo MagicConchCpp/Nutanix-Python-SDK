@@ -32,6 +32,7 @@ import urllib3
 import json
 import logging
 import logging.config
+import os
 
 DOCUMENTATION = r'''
     name: nutanix_api.client
@@ -53,6 +54,7 @@ EXAMPLES = r'''
 
 # Setup logging
 logger = logging.getLogger('ntnx_api.client')
+logging_level = os.environ.get('NTNX_API_LOG_LEVEL', 'WARNING').upper()
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,  # this fixes the problem
@@ -63,7 +65,7 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.client': {
-            'level': 'INFO',
+            'level': logging_level,
             'class': 'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"

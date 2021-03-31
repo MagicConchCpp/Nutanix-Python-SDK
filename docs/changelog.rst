@@ -7,6 +7,18 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.29", "3/31/2021", "Added prism.Config.get_protection_rules."
+    "1.1.28", "3/31/2021", "Resolved issue where ProtectionRules were being returned as categories on each VM/Host assigned to the protection rule."
+    "1.1.27", "3/31/2021", "Resolved issue with if statements within prism.Config.get_projects and prism.Config.get_project_usage."
+    "1.1.26", "3/31/2021", "Resolved issue with identifying a PC instance within prism.Cluster.get_all_uuids."
+    "1.1.25", "3/31/2021", "Changed logging level on prism.Cluster.get_all_uuids to info."
+    "1.1.24", "3/31/2021", "Added debug logging to prism.Cluster.get_all_uuids."
+    "1.1.23", "3/30/2021", "Fixed issue with if clause in prism.Hosts.get_project and prism.Vms.get_project."
+    "1.1.22", "3/30/2021", "Fixed variable typo in prism.Hosts.get_project and prism.Hosts.get_categories."
+    "1.1.21", "3/30/2021", "Fixed flake8 warnings for logging changes."
+    "1.1.21", "3/30/2021", "Updated logging to use an environment variable NTNX_API_LOG_LEVEL to dictate stdout logging. Default log level is WARNING"
+    "1.1.20", "3/30/2021", "Resolved issues with metadata functions. Renamed variables in vms tests."
+    "1.1.19", "3/30/2021", "Updated prism.Hosts/Vms.get_project and prism.Hosts/Vmss.get_categories. Added prism.Vm.get_metadata and prism.Host.get_metadata."
     "1.1.18", "3/26/2021", "Resolved issue payload dict config with prism.Config.*_categories and prism.Config.*_projects"
     "1.1.17", "3/26/2021", "Resolved issue with the returned value from prism.Cluster.get"
     "1.1.16", "3/26/2021", "Changed version import in __init.py__ to be absolute. Modified Vm.get to allow for conditional return of both VM disks and VM nics."

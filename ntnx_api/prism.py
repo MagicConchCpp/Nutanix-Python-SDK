@@ -51,6 +51,7 @@ import time
 from random import random
 import threading
 import paramiko
+import os
 
 __metaclass__ = type
 
@@ -84,6 +85,7 @@ EXAMPLES = r'''
 
 # Setup logging
 logger = logging.getLogger('ntnx_api.client')
+logging_level = os.environ.get('NTNX_API_LOG_LEVEL', 'WARNING').upper()
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,  # this fixes the problem
@@ -94,8 +96,8 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.prism': {
-            'level':'INFO',
-            'class':'logging.StreamHandler',
+            'level': logging_level,
+            'class': 'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"
         },
@@ -135,6 +137,7 @@ class Config(object):
         self.ntp_servers = {}
         self.dns_servers = {}
         self.proxy = {}
+        self.protection_rules = {}
 
     def get_ui_config(self, clusteruuid=None):
         """Get the configuration data for a clusters Prism Element user interface
@@ -259,20 +262,16 @@ class Config(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_projects')
         params = {}
+        self.projects = {}
 
-        if self.api_client == "pc":
+        if self.api_client.connection_type == "pc":
             uri = '/projects/list'
             payload = {
                 "kind": "project",
                 "offset": 0,
                 "length": 2147483647
             }
-            self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get(
-                'entities')
-
-        else:
-            # pe does not expose project data
-            self.projects = {}
+            self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
 
         return self.projects
 
@@ -288,7 +287,7 @@ class Config(object):
         params = {}
         result = []
 
-        if self.api_client == "pc":
+        if self.api_client.connection_type == "pc":
             uri = '/vms/list'
             payload = {
                 "kind": "vm",
@@ -308,10 +307,6 @@ class Config(object):
                             'uuid': vm.get('metadata').get('uuid')
                         }
                         result.append(item)
-
-        else:
-            # pe does not expose category data
-            pass
 
         return result
 
@@ -2246,6 +2241,26 @@ class Config(object):
             stdin, stdout, stderr = ssh.exec_command(command)
             logger.debug(stdout.readlines())
 
+    def get_protection_rules(self):
+        """Retrieve data for all protection rules.
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_protection_rules')
+        params = {}
+
+        if self.api_client.connection_type == "pc":
+            self.protection_rules = {}
+            uri = '/protection_rules/list'
+            payload = {
+                "kind": "protection_rule",
+                "offset": 0,
+                "length": 2147483647
+            }
+            self.protection_rules = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
+
+        return self.protection_rules
+
 
 class Cluster(object):
     """A class to represent a Nutanix Cluster
@@ -2287,13 +2302,12 @@ class Cluster(object):
             uri = '/clusters'
 
         clusters = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
-
         # Only return PE clusters ie. exclude any clusters defined as MULTICLUSTER or where the cluster name is not set
         cluster_list = []
         if self.api_client.connection_type == "pc":
             for cluster in clusters:
-                if "PRISM_CENTRAL" not in cluster.get('status').get('resources').get('config').get('service_list') or \
-                        cluster.get('status').get('name') != 'Unnamed':
+                logger.info('returned cluster: {0}'.format(cluster))
+                if "PRISM_CENTRAL" not in cluster.get('status').get('resources').get('config').get('service_list'):
                     cluster_list.append(cluster)
         else:
             cluster_list = clusters
@@ -2430,6 +2444,7 @@ class Hosts(object):
         logger = logging.getLogger('ntnx_api.prism.Hosts.__init__')
         self.api_client = api_client
         self.hosts = {}
+        self.metadata = {}
 
     def get(self, clusteruuid=None):
         """Retrieve data for each host in a specific cluster
@@ -2454,9 +2469,34 @@ class Hosts(object):
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
 
-        self.hosts[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get(
-            'entities')
+        self.hosts[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.hosts[clusteruuid]
+
+    def get_metadata(self, refresh=False):
+        """Retrieve metadata for each host from the connected PC instance
+
+        :returns: A list of dictionaries describing each vm from the specified cluster.
+        :rtype: ResponseList
+        """
+        params = {}
+        payload = {
+            "kind": "host",
+            "offset": 0,
+            "length": 2147483647
+        }
+        uri = '/hosts/list'
+
+        if self.api_client.connection_type == "pc":
+            # Remove existing data for this cluster if it exists
+            if not self.metadata or refresh:
+                self.metadata = {}
+                logger.info('removing existing data from class dict metadata')
+
+                hosts = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
+                for host in hosts:
+                    self.metadata[host.get('metadata').get('uuid')] = host.get('metadata')
+
+        return self.metadata
 
     def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific host, in a specific cluster by host uuid
@@ -2534,12 +2574,9 @@ class Hosts(object):
 
         return found
 
-    def get_project(self, uuid, clusteruuid=None, refresh=False):
+    def get_project(self, uuid, refresh=False):
         """Retrieve the project assigned to the specified host if connected to a prism central
 
-        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
-                            `connection_type` is set to `pc`.
-        :type clusteruuid: str, optional
         :param uuid: The UUID of a host.
         :type uuid: str
         :param refresh: Whether to refresh the class dataset (default=False).
@@ -2550,33 +2587,43 @@ class Hosts(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Hosts.get_project')
         project = ''
-        if self.api_client.connection_type == 'pc':
-            metadata = self.search_uuid(uuid=uuid, clusteruuid=clusteruuid, refresh=refresh).get('vm_metadata')
-            if metadata.get('project_reference').get('kind') == 'project':
-                project = metadata.get('project_reference').get('name')
+        if self.api_client.connection_type == "pc":
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
+                if metadata.get('project_reference'):
+                    if metadata.get('project_reference').get('kind') == 'project':
+                        project = metadata.get('project_reference').get('name')
+                        logger.info('host "{0}" project "{1}"'.format(uuid, project))
         return project
 
-    def get_categories(self, uuid, clusteruuid=None, refresh=False):
+    def get_categories(self, uuid, refresh=False):
         """Retrieve the categories assigned to the specified host if connected to a prism central
 
-        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
-                            `connection_type` is set to `pc`.
-        :type clusteruuid: str, optional
         :param uuid: The UUID of a host.
         :type uuid: str
         :param refresh: Whether to refresh the class dataset (default=False).
         :type refresh: bool, optional
 
-        :returns: A dictionary with all .
+        :returns: A dictionary with all categories for the specified host.
         :rtype: ResponseDict
         """
         logger = logging.getLogger('ntnx_api.prism.Hosts.get_categories')
-        categories = []
-        if self.api_client.connection_type == 'pc':
-            metadata = self.search_uuid(uuid=uuid, clusteruuid=clusteruuid, refresh=refresh).get('categories')
-            if metadata.get('project_reference').get('kind') == 'project':
-                for key, value in metadata.get('categories').items():
-                    categories[key] = value
+        categories = {}
+        if self.api_client.connection_type == "pc":
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
+                if 'categories' in metadata:
+                    for key, value in metadata.get('categories').items():
+                        # Skip keys that do not relate to categories
+                        items_to_exclude = [
+                            'ProtectionRule',
+                        ]
+                        if not any(value in key for value in items_to_exclude):
+                            categories[key] = value
         return categories
 
 
@@ -2591,6 +2638,7 @@ class Vms(object):
         logger = logging.getLogger('ntnx_api.prism.Vms.__init__')
         self.api_client = api_client
         self.vms = {}
+        self.metadata = {}
 
     def get(self, clusteruuid=None, include_disks=True, include_nics=True):
         """Retrieve host data for each virtual machine in a specific cluster
@@ -2632,6 +2680,33 @@ class Vms(object):
 
         self.vms[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
         return self.vms[clusteruuid]
+
+    def get_metadata(self, refresh=False):
+        """Retrieve metadata for each virtual machine from the connected PC instance
+
+        :returns: A list of dictionaries describing each vm from the specified cluster.
+        :rtype: ResponseList
+        """
+        params = {}
+        payload = {
+            "kind": "vm",
+            "offset": 0,
+            "length": 2147483647
+        }
+        uri = '/vms/list'
+
+        if self.api_client.connection_type == "pc":
+            # Remove existing data for this cluster if it exists
+            if not self.metadata or refresh:
+                self.metadata = {}
+                logger.info('removing existing data from class dict metadata')
+
+                vms = self.api_client.request(uri=uri, api_version='v3', payload=payload, params=params).get('entities')
+                logger.info('returned data: {0}'.format(vms))
+                for vm in vms:
+                    self.metadata[vm.get('metadata').get('uuid')] = vm.get('metadata')
+
+        return self.metadata
 
     def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific vm, in a specific cluster by vm uuid
@@ -2685,15 +2760,12 @@ class Vms(object):
 
         return found
 
-    def get_project(self, uuid, clusteruuid=None, refresh=False):
+    def get_project(self, uuid, refresh=False):
         """Retrieve the project assigned to the specified VM if connected to a prism central
 
-        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
-                            `connection_type` is set to `pc`.
-        :type clusteruuid: str, optional
         :param uuid: The UUID of a VM.
         :type uuid: str
-        :param refresh: Whether to refresh the class VM dataset (default=False).
+        :param refresh: Whether to refresh the class VM Metadata dataset (default=False).
         :type refresh: bool, optional
 
         :returns: A string containing the project name.
@@ -2701,33 +2773,43 @@ class Vms(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.get_project')
         project = ''
-        if self.api_client.connection_type == 'pc':
-            metadata = self.search_uuid(uuid=uuid, clusteruuid=clusteruuid, refresh=refresh).get('vm_metadata')
-            if metadata.get('project_reference').get('kind') == 'project':
-                project = metadata.get('project_reference').get('name')
+        if self.api_client.connection_type == "pc":
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
+                if metadata.get('project_reference'):
+                    if metadata.get('project_reference').get('kind') == 'project':
+                        project = metadata.get('project_reference').get('name')
         return project
 
-    def get_categories(self, uuid, clusteruuid=None, refresh=False):
+    def get_categories(self, uuid, refresh=False):
         """Retrieve the categories assigned to the specified VM if connected to a prism central
 
-        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
-                            `connection_type` is set to `pc`.
-        :type clusteruuid: str, optional
         :param uuid: The UUID of a VM.
         :type uuid: str
-        :param refresh: Whether to refresh the class VM dataset (default=False).
+        :param refresh: Whether to refresh the class VM Metadata dataset (default=False).
         :type refresh: bool, optional
 
         :returns: A dictionary with all .
         :rtype: ResponseDict
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.get_categories')
-        categories = []
-        if self.api_client.connection_type == 'pc':
-            metadata = self.search_uuid(uuid=uuid, clusteruuid=clusteruuid, refresh=refresh).get('categories')
-            if metadata.get('project_reference').get('kind') == 'project':
-                for key, value in metadata.get('categories').items():
-                    categories[key] = value
+        categories = {}
+        if self.api_client.connection_type == "pc":
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
+                if 'categories' in metadata:
+                    for key, value in metadata.get('categories').items():
+
+                        # Skip keys that do not relate to categories
+                        items_to_exclude = [
+                            'ProtectionRule',
+                        ]
+                        if not any(value in key for value in items_to_exclude):
+                            categories[key] = value
         return categories
 
 
