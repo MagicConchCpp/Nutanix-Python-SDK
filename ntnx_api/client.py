@@ -32,6 +32,7 @@ import urllib3
 import json
 import logging
 import logging.config
+import os
 
 DOCUMENTATION = r'''
     name: nutanix_api.client
@@ -64,7 +65,7 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.client': {
-            'level':logging_level,
+            'level': logging_level,
             'class': 'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"

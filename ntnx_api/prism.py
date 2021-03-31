@@ -96,8 +96,8 @@ logging.config.dictConfig({
     },
     'handlers': {
         'ntnx_api.prism': {
-            'level':logging_level,
-            'class':'logging.StreamHandler',
+            'level': logging_level,
+            'class': 'logging.StreamHandler',
             "formatter": "standard",
             "stream": "ext://sys.stdout"
         },

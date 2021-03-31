@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.21", "3/30/2021", "Fixed flake8 warnings for logging changes."
     "1.1.21", "3/30/2021", "Updated logging to use an environment variable NTNX_API_LOG_LEVEL to dictate stdout logging. Default log level is WARNING"
     "1.1.20", "3/30/2021", "Resolved issues with metadata functions. Renamed variables in vms tests."
     "1.1.19", "3/30/2021", "Updated *.get_project and *.get_categories. Added prism.Vm.get_metadata and prism.Host.get_metadata."
