@@ -261,8 +261,9 @@ class Config(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_projects')
         params = {}
+        self.projects = {}
 
-        if self.api_client == "pc":
+        if self.api_client.connection_type == "pc":
             uri = '/projects/list'
             payload = {
                 "kind": "project",
@@ -270,10 +271,6 @@ class Config(object):
                 "length": 2147483647
             }
             self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
-
-        else:
-            # pe does not expose project data
-            self.projects = {}
 
         return self.projects
 
@@ -289,7 +286,7 @@ class Config(object):
         params = {}
         result = []
 
-        if self.api_client == "pc":
+        if self.api_client.connection_type == "pc":
             uri = '/vms/list'
             payload = {
                 "kind": "vm",
@@ -309,10 +306,6 @@ class Config(object):
                             'uuid': vm.get('metadata').get('uuid')
                         }
                         result.append(item)
-
-        else:
-            # pe does not expose category data
-            pass
 
         return result
 
