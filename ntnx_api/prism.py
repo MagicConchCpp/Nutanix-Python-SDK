@@ -2296,8 +2296,7 @@ class Cluster(object):
         if self.api_client.connection_type == "pc":
             for cluster in clusters:
                 logger.info('returned cluster: {0}'.format(cluster))
-                if "PRISM_CENTRAL" not in cluster.get('status').get('resources').get('config').get('service_list') or \
-                        cluster.get('status').get('name') != 'Unnamed':
+                if "PRISM_CENTRAL" not in cluster.get('status').get('resources').get('config').get('service_list'):
                     cluster_list.append(cluster)
         else:
             cluster_list = clusters

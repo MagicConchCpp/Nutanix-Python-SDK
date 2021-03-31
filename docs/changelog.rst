@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.26", "3/31/2021", "Resolve issue with identifying a PC instance within prism.Cluster.get_all_uuids."
     "1.1.25", "3/31/2021", "Changed logging level on prism.Cluster.get_all_uuids to info."
     "1.1.24", "3/31/2021", "Added debug logging to prism.Cluster.get_all_uuids."
     "1.1.23", "3/30/2021", "Fixed issue with if clause in prism.Hosts.get_project and prism.Vms.get_project."
