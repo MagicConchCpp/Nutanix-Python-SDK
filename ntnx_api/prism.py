@@ -137,6 +137,7 @@ class Config(object):
         self.ntp_servers = {}
         self.dns_servers = {}
         self.proxy = {}
+        self.protection_rules = {}
 
     def get_ui_config(self, clusteruuid=None):
         """Get the configuration data for a clusters Prism Element user interface
@@ -2242,6 +2243,26 @@ class Config(object):
             ssh.connect(host, port, ssh_user, ssh_password)
             stdin, stdout, stderr = ssh.exec_command(command)
             logger.debug(stdout.readlines())
+
+    def get_protection_rules(self):
+        """Retrieve data for all protection rules.
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Config.get_protection_rules')
+        params = {}
+
+        if self.api_client.connection_type == "pc":
+            self.protection_rules = {}
+            uri = '/protection_rules/list'
+            payload = {
+                "kind": "protection_rule",
+                "offset": 0,
+                "length": 2147483647
+            }
+            self.protection_rules = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
+
+        return self.protection_rules
 
 
 class Cluster(object):
