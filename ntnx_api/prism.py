@@ -2600,7 +2600,12 @@ class Hosts(object):
                 logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
-                        categories[key] = value
+                        # Skip keys that do not relate to categories
+                        items_to_exclude = [
+                            'ProtectionRule',
+                        ]
+                        if not any(value in key for value in items_to_exclude):
+                            categories[key] = value
         return categories
 
 
@@ -2780,7 +2785,13 @@ class Vms(object):
                 logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
-                        categories[key] = value
+
+                        # Skip keys that do not relate to categories
+                        items_to_exclude = [
+                            'ProtectionRule',
+                        ]
+                        if not any(value in key for value in items_to_exclude):
+                            categories[key] = value
         return categories
 
 
