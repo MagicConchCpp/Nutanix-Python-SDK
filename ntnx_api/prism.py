@@ -2582,8 +2582,11 @@ class Hosts(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
-                if metadata.get('project_reference').get('kind') == 'project':
-                    project = metadata.get('project_reference').get('name')
+                logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
+                if metadata.get('project_reference'):
+                    if metadata.get('project_reference').get('kind') == 'project':
+                        project = metadata.get('project_reference').get('name')
+                        logger.info('host "{0}" project "{1}"'.format(uuid, project))
         return project
 
     def get_categories(self, uuid, refresh=False):
@@ -2603,6 +2606,7 @@ class Hosts(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
+                logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
                         categories[key] = value
@@ -2759,8 +2763,10 @@ class Vms(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
-                if metadata.get('project_reference').get('kind') == 'project':
-                    project = metadata.get('project_reference').get('name')
+                logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
+                if metadata.get('project_reference'):
+                    if metadata.get('project_reference').get('kind') == 'project':
+                        project = metadata.get('project_reference').get('name')
         return project
 
     def get_categories(self, uuid, refresh=False):
@@ -2780,6 +2786,7 @@ class Vms(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
+                logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
                         categories[key] = value
