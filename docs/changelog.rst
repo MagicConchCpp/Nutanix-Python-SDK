@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.1.30", "4/1/2021", "Added prism.Vms.get_protection_rules."
     "1.1.29", "3/31/2021", "Added prism.Config.get_protection_rules."
     "1.1.28", "3/31/2021", "Resolved issue where ProtectionRules were being returned as categories on each VM/Host assigned to the protection rule."
     "1.1.27", "3/31/2021", "Resolved issue with if statements within prism.Config.get_projects and prism.Config.get_project_usage."

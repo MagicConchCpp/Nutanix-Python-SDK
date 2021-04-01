@@ -2615,7 +2615,6 @@ class Hosts(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
-                logger.info('host "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
                         # Skip keys that do not relate to categories
@@ -2623,6 +2622,7 @@ class Hosts(object):
                             'ProtectionRule',
                         ]
                         if not any(value in key for value in items_to_exclude):
+                            logger.info('host "{0}" category "{1}:{2}"'.format(uuid, key, value))
                             categories[key] = value
         return categories
 
@@ -2800,7 +2800,6 @@ class Vms(object):
             self.get_metadata(refresh=refresh)
             metadata = self.metadata.get(uuid)
             if metadata:
-                logger.info('vm "{0}" metadata "{1}"'.format(uuid, metadata))
                 if 'categories' in metadata:
                     for key, value in metadata.get('categories').items():
 
@@ -2809,8 +2808,38 @@ class Vms(object):
                             'ProtectionRule',
                         ]
                         if not any(value in key for value in items_to_exclude):
+                            logger.info('vm "{0}" category "{1}:{2}"'.format(uuid, key, value))
                             categories[key] = value
         return categories
+
+    def get_protection_rules(self, uuid, refresh=False):
+        """Retrieve the protection rules assigned to the specified VM if connected to a prism central
+
+        :param uuid: The UUID of a VM.
+        :type uuid: str
+        :param refresh: Whether to refresh the class VM Metadata dataset (default=False).
+        :type refresh: bool, optional
+
+        :returns: A dictionary with all .
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.get_protection_rules')
+        protection_rules = {}
+        if self.api_client.connection_type == "pc":
+            self.get_metadata(refresh=refresh)
+            metadata = self.metadata.get(uuid)
+            if metadata:
+                if 'categories' in metadata:
+                    for key, value in metadata.get('categories').items():
+
+                        # Skip keys that do not relate to categories
+                        items_to_include = [
+                            'ProtectionRule',
+                        ]
+                        if any(value in key for value in items_to_include):
+                            logger.info('vm "{0}" protection rule "{1}:{2}"'.format(uuid, key, value))
+                            protection_rules[key] = value
+        return protection_rules
 
 
 class Images(object):
