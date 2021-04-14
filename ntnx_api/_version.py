@@ -3,5 +3,5 @@
 # 2) we can import it in setup.py for the same reason
 # 3) we can import it into your module module
 
-__version_info__ = ('1', '2', '3')
+__version_info__ = ('1', '2', '4')
 __version__ = '.'.join(__version_info__)

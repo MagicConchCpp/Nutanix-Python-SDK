@@ -3604,7 +3604,7 @@ class StorageContainer(object):
         container_uuid = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True).get('storage_container_uuid')
 
         if container_uuid:
-            return self.delete_by_uuid(uuid=container_uuid, clusteruuid=clusteruuid)
+            return self.delete_uuid(uuid=container_uuid, clusteruuid=clusteruuid)
             logger.info('deleted container {0} on cluster {1}'.format(name, clusteruuid))
         else:
             logger.warning('container {0} not found on cluster {1}'.format(name, clusteruuid))
