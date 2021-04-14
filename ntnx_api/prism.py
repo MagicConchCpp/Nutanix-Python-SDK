@@ -3320,6 +3320,7 @@ class StorageContainer(object):
         if not self.storage_containers.get(clusteruuid) or refresh:
             logger.info('refreshing storage containers')
             self.get(clusteruuid)
+
         logger.info('searching containers in cluster "{0}" for uuid "{1}".'.format(clusteruuid, uuid))
         logger.info('cluster {0} storage containers: {1}'.format(clusteruuid, self.storage_containers.get(clusteruuid)))
         found = next((item for item in self.storage_containers.get(clusteruuid) if item.get("storage_container_uuid") == uuid), None)
@@ -3339,19 +3340,13 @@ class StorageContainer(object):
         :rtype: ResponseDict
         """
         logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_name')
-        # found = None
         if not self.storage_containers.get(clusteruuid) or refresh:
             logger.info('refreshing storage containers')
             self.get(clusteruuid)
 
-        # containers = self.storage_containers.get(clusteruuid)
         logger.info('searching containers in cluster "{0}" for name "{1}".'.format(clusteruuid, name))
         logger.info('cluster {0} storage containers: {1}'.format(clusteruuid, self.storage_containers.get(clusteruuid)))
         found = next((item for item in self.storage_containers.get(clusteruuid) if item.get("name") == name), None)
-        # for entity in containers:
-        #     if entity.get('name') == name:
-        #         found = entity
-        #         break
         logger.info('found storage container: {0}'.format(found))
         return found
 
