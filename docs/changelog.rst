@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.2.2", "4/14/2021", "Added StoragePool.get, StoragePool.search_uuid, StoragePool.search_name, StoragePool.get, StorageContainer.create, StorageContainer.update, StorageContainer.delete_name and StorageContainer.delete_uuid."
     "1.1.30", "4/1/2021", "Added prism.Vms.get_protection_rules."
     "1.1.29", "3/31/2021", "Added prism.Config.get_protection_rules."
     "1.1.28", "3/31/2021", "Resolved issue where ProtectionRules were being returned as categories on each VM/Host assigned to the protection rule."

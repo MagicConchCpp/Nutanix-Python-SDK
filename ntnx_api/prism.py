@@ -31,6 +31,11 @@ Images
 .. autoclass:: ntnx_api.prism.Images
     :members:
 
+StoragePool
+^^^^^^^^^^^^^^^^
+.. autoclass:: ntnx_api.prism.StoragePool
+    :members:
+
 StorageContainer
 ^^^^^^^^^^^^^^^^
 .. autoclass:: ntnx_api.prism.StorageContainer
@@ -3074,7 +3079,7 @@ class Images(object):
             else:
                 logger.info('task created to upload image {0}'.format(upload_task_uuid))
 
-    def upload_from_file(self, name, file_path, storage_container_uuid, image_type='DISK_IMAGE', annotation='', clusteruuid=None, wait=False):
+    def upload_from_file(self, name, file_path, storage_container_uuid, image_type='disk', annotation='', clusteruuid=None, wait=False):
         """ Upload an image from a file path. The target file path needs to be accessible on the device running this script.
 
         :param name: A name for the image to be creted.
@@ -3100,6 +3105,11 @@ class Images(object):
         params = {}
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
+
+        if image_type == 'disk':
+            image_type = 'DISK_IMAGE'
+        else:
+            image_type = 'ISO_IMAGE'
 
         # check image with the same name doesn't already exist
         image_search = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
@@ -3166,6 +3176,95 @@ class Images(object):
                 return False
 
 
+class StoragePool(object):
+    """A class to represent a Nutanix Clusters Storage Pool object.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+
+    def __init__(self, api_client):
+        logger = logging.getLogger('ntnx_api.prism.StoragePool.__init__')
+        self.api_client = api_client
+        self.storage_pools = {}
+
+    def get(self, clusteruuid=None):
+        """Retrieve data for each storage pool in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+
+        :returns: A list of dictionaries describing each storage pool from the specified cluster.
+        :rtype: ResponseList
+        """
+        logger = logging.getLogger('ntnx_api.prism.StoragePool.get')
+
+        # Remove existing data for this cluster if it exists
+        if self.storage_pools.get(clusteruuid):
+            self.storage_pools.pop(clusteruuid)
+            logger.info('removing existing data from class dict storage_containers for cluster {0}'.format(clusteruuid))
+
+        params = {'count': '2147483647'}
+        payload = None
+        uri = '/storage_pools'
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        self.storage_pools[clusteruuid] = self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params).get('entities')
+        return self.storage_pools[clusteruuid]
+
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific storage pool, in a specific cluster by uuid
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param uuid: A container uuid to search for.
+        :type uuid: str, optional
+        :returns: A dictionary describing the found storage pool.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.StoragePool.search_uuid')
+        # found = {}
+        if not self.storage_pools.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        # for entity in self.storage_pools.get(clusteruuid):
+        #     if entity.get('storagePoolUuid') == uuid:
+        #         found = entity
+        #         break
+        found = next((item for item in self.storage_pools.get(clusteruuid) if item.get("storagePoolUuid") == uuid), None)
+
+        return found
+
+    def search_name(self, name, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific storage pool, in a specific cluster by uuid
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: A storage pool name to search for.
+        :type name: str, optional
+
+        :returns: A dictionary describing the found storage pool.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.StoragePool.search_name')
+        # found = {}
+        if not self.storage_pools.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        # for entity in self.storage_pools.get(clusteruuid):
+        #     if entity.get('name') == name:
+        #         found = entity
+        #         break
+        found = next((item for item in self.storage_pools.get(clusteruuid) if item.get("name") == name), None)
+
+        return found
+
+
 class StorageContainer(object):
     """A class to represent a Nutanix Clusters Storage Container object.
 
@@ -3203,7 +3302,8 @@ class StorageContainer(object):
             params['proxyClusterUuid'] = clusteruuid
 
         self.storage_containers[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
-        return self.storage_containers[clusteruuid]
+        logger.info('retrived containers for cluster {0}: {1}'.format(clusteruuid, self.storage_containers.get(clusteruuid)))
+        return self.storage_containers.get(clusteruuid)
 
     def search_uuid(self, uuid, clusteruuid=None, refresh=False):
         """Retrieve data for a specific container, in a specific cluster by container uuid
@@ -3217,15 +3317,13 @@ class StorageContainer(object):
         :rtype: ResponseDict
         """
         logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_uuid')
-        found = {}
         if not self.storage_containers.get(clusteruuid) or refresh:
+            logger.info('refreshing storage containers')
             self.get(clusteruuid)
-
-        for entity in self.storage_containers.get(clusteruuid):
-            if entity.get('storage_container_uuid') == uuid:
-                found = entity
-                break
-
+        logger.info('searching containers in cluster "{0}" for uuid "{1}".'.format(clusteruuid, uuid))
+        logger.info('cluster {0} storage containers: {1}'.format(clusteruuid, self.storage_containers.get(clusteruuid)))
+        found = next((item for item in self.storage_containers.get(clusteruuid) if item.get("storage_container_uuid") == uuid), None)
+        logger.info('found storage container: {0}'.format(found))
         return found
 
     def search_name(self, name, clusteruuid=None, refresh=False):
@@ -3241,17 +3339,310 @@ class StorageContainer(object):
         :rtype: ResponseDict
         """
         logger = logging.getLogger('ntnx_api.prism.StorageContainer.search_name')
-        found = {}
+        # found = None
         if not self.storage_containers.get(clusteruuid) or refresh:
+            logger.info('refreshing storage containers')
             self.get(clusteruuid)
 
-        for entity in self.storage_containers.get(clusteruuid):
-            if entity.get('name') == name:
-                found = entity
-                break
-
+        # containers = self.storage_containers.get(clusteruuid)
+        logger.info('searching containers in cluster "{0}" for name "{1}".'.format(clusteruuid, name))
+        logger.info('cluster {0} storage containers: {1}'.format(clusteruuid, self.storage_containers.get(clusteruuid)))
+        found = next((item for item in self.storage_containers.get(clusteruuid) if item.get("name") == name), None)
+        # for entity in containers:
+        #     if entity.get('name') == name:
+        #         found = entity
+        #         break
+        logger.info('found storage container: {0}'.format(found))
         return found
 
+    def create(self, name, rf=2, oplog_rf=2, reserved=None, advertised=None, compression=True, compression_delay=0, dedupe_cache=False, dedupe_capacity=False,
+               ecx=False, ecx_delay=None, whitelist=None, storage_pool_uuid=None, clusteruuid=None):
+        """Create a new container in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name for the new container. Only unique container names are allowed.
+        :type name: str
+        :param rf: The RF level of the container.
+        :type rf: int, optional
+        :param oplog_rf: The RF level of the container.
+        :type oplog_rf: int, optional
+        :param reserved: The reservation size of the container in bytes.
+        :type reserved: int, optional
+        :param advertised: The advertised size of the container in bytes.
+        :type advertised: int, optional
+        :param compression: Whether to enable compression.
+        :type compression: bool, optional
+        :param compression_delay: The amount of time in secs before data is compressed Set to 0 for inline compression.
+        :type compression_delay: int, optional
+        :param dedupe_cache: Whether to apply deduplication to data in the cache tier.
+        :type dedupe_cache: bool, optional
+        :param dedupe_capacity: Whether to apply deduplication to data in the capacity tier.
+        :type dedupe_capacity: bool, optional
+        :param ecx: Whether to enable erasure coding.
+        :type ecx: bool, optional
+        :param ecx_delay: The age of the data in the capacity tier in seconds before erasure coding is applied.
+        :type ecx_delay: int, optional
+        :param whitelist: A list of IPs/subnets to whiteist for access to this container. Used for data migration purposes onle.
+        :type whitelist: list, optional
+
+        :returns: `True` if the container was sucessfully created, `False` if creation failed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.create')
+        params = {}
+        payload = {}
+        uri = '/storage_containers'
+        method = 'POST'
+        response_code = 201
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if storage_pool_uuid:
+            storage_pool_obj = StoragePool(api_client=self.api_client)
+            found_storage_pool = storage_pool_obj.search_uuid(uuid=storage_pool_uuid, clusteruuid=clusteruuid)
+            if not found_storage_pool:
+                raise ValueError('Storage Pool UUID "{0}" not found on the cluster. Please check inputs and try again.'.format(storage_pool_uuid))
+
+        # Check whether a container with same name already exists
+        if not self.search_name(name=name, clusteruuid=clusteruuid, refresh=True):
+            payload['name'] = name
+            payload['replication_factor'] = rf
+            payload['oplog_replication_factor'] = oplog_rf
+
+            if storage_pool_uuid:
+                payload['storage_pool_uuid'] = storage_pool_uuid
+
+            if compression:
+                payload['compression_enabled'] = 'true'
+
+            if compression:
+                payload['compression_delay_in_secs'] = compression_delay
+
+            if advertised:
+                payload['advertised_capacity'] = advertised
+
+            if reserved:
+                payload['total_explicit_reserved_capacity'] = reserved
+            else:
+                payload['total_explicit_reserved_capacity'] = 0
+
+            if ecx:
+                payload['erasure_code'] = 'on'
+
+                if ecx_delay:
+                    payload['erasure_code_delay_secs'] = ecx_delay
+            else:
+                payload['erasure_code'] = 'off'
+
+            if dedupe_cache:
+                payload['finger_print_on_write'] = 'on'
+
+                if dedupe_capacity:
+                    payload['on_disk_dedup'] = 'POST_PROCESS'
+                else:
+                    payload['on_disk_dedup'] = 'OFF'
+
+            else:
+                payload['finger_print_on_write'] = 'off'
+                payload['on_disk_dedup'] = 'OFF'
+
+            if whitelist:
+                if isinstance(whitelist, list):
+                    payload['nfs_whitelist'] = whitelist
+                else:
+                    logger.warning('whitelist {0} is not in the correct format. Please provide a list ["10.0.0.0/24","10.0.0.1/24"]'.format(name, clusteruuid))
+
+            return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code).get('value')
+
+        else:
+            raise ValueError('A Storage Pool "{0}" with the same name already exists on this cluster. Please check inputs and try again.'.format(name))
+
+    def update(self, name, reserved=None, advertised=None, compression=True, compression_delay=0, dedupe_cache=False, dedupe_capacity=False, ecx=False,
+               ecx_delay=None, whitelist=None, clusteruuid=None):
+        """Update a specific container in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name for the existing container.
+        :type name: str
+        :param reserved: The reservation size of the container in bytes.
+        :type reserved: int, optional
+        :param advertised: The advertised size of the container in bytes.
+        :type advertised: int, optional
+        :param compression: Whether to enable compression.
+        :type compression: bool, optional
+        :param compression_delay: The amount of time in secs before data is compressed Set to 0 for inline compression.
+        :type compression_delay: int, optional
+        :param dedupe_cache: Whether to apply deduplication to data in the cache tier.
+        :type dedupe_cache: bool, optional
+        :param dedupe_capacity: Whether to apply deduplication to data in the capacity tier.
+        :type dedupe_capacity: bool, optional
+        :param ecx: Whether to enable erasure coding.
+        :type ecx: bool, optional
+        :param ecx_delay: The age of the data in the capacity tier in seconds before erasure coding is applied.
+        :type ecx_delay: int, optional
+        :param whitelist: A list of IPs/subnets to whiteist for access to this container. Used for data migration purposes onle.
+        :type whitelist: list, optional
+
+        :returns: `True` if the container was successfully updated, `False` if the update failed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.create')
+        params = {}
+        uri = '/storage_containers'
+        method = 'PUT'
+        response_code = 200
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        # Check whether a container with same name already exists
+        payload = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        logger.debug('container found: {0}'.format(payload))
+        if payload:
+            remove_keys = [
+                'stats',
+                'usage_stats',
+                'seq_io_preference',
+                'ilm_policy',
+                'down_migrate_times_in_secs',
+                'random_io_preference',
+                'marked_for_removal',
+                'max_capacity',
+            ]
+            for key in remove_keys:
+                payload.pop(key)
+
+            compression_lookup = {
+                'true': True,
+                'false': False,
+            }
+            if compression != compression_lookup.get(payload.get('compression_enabled')):
+                payload['compression_enabled'] = compression
+                logger.info('setting "compression_enabled" to "{0}"'.format(compression))
+            else:
+                payload['compression_enabled'] = payload.get('compression_enabled')
+                logger.info('leaving "compression_enabled" at its original value of "{0}"'.format(payload.get('compression_enabled')))
+
+            if compression_delay != payload.get('compression_delay_in_secs') and compression:
+                payload['compression_delay_in_secs'] = compression_delay
+                logger.info('setting "compression_delay_in_secs" to "{0}"'.format(compression_delay))
+            else:
+                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
+                logger.info('leaving "compression_delay_in_secs" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
+
+            if advertised != payload.get('advertised_capacity'):
+                payload['advertised_capacity'] = advertised
+                logger.info('setting "advertised_capacity" to "{0}"'.format(advertised))
+            else:
+                payload['advertised_capacity'] = payload.get('advertised_capacity')
+                logger.info('leaving "advertised_capacity" at its original value of "{0}"'.format(payload.get('advertised_capacity')))
+
+            if reserved != payload.get('total_explicit_reserved_capacity'):
+                payload['total_explicit_reserved_capacity'] = reserved
+                logger.info('setting "total_explicit_reserved_capacity" to "{0}"'.format(reserved))
+            else:
+                payload['total_explicit_reserved_capacity'] = payload.get('total_explicit_reserved_capacity')
+                logger.info('leaving "total_explicit_reserved_capacity" at its original value of "{0}"'.format(payload.get('total_explicit_reserved_capacity')))
+
+            if dedupe_cache != payload.get('compression_delay_in_secs'):
+                payload['compression_delay_in_secs'] = compression_delay
+                logger.info('setting "dedupe_cache" to "{0}"'.format(dedupe_cache))
+            else:
+                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
+                logger.info('leaving "dedupe_cache" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
+
+            dedupe_capacity_lookup = {
+                'OFF': False,
+                'NONE': False,
+                'POST_PROCESS': True,
+            }
+            if dedupe_capacity != dedupe_capacity_lookup.get(payload.get('on_disk_dedup')):
+                payload['compression_delay_in_secs'] = dedupe_capacity
+                logger.info('setting "on_disk_dedup" to "{0}"'.format(dedupe_capacity))
+            else:
+                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
+                logger.info('leaving "on_disk_dedup" at its original value of "{0}"'.format(payload.get('on_disk_dedup')))
+
+            ecx_lookup = {
+                'on': True,
+                'off': False,
+            }
+            if ecx != ecx_lookup.get(payload.get('erasure_code')):
+                payload['erasure_code'] = 'on'
+            else:
+                payload['erasure_code'] = 'off'
+
+            if ecx_delay:
+                if ecx_delay != payload['erasure_code_delay_secs']:
+                    payload['erasure_code_delay_secs'] = ecx_delay
+
+            if whitelist:
+                if isinstance(whitelist, list):
+                    if all(item in whitelist for item in payload.get('nfs_whitelist')):
+                        payload['nfs_whitelist'] = whitelist
+                else:
+                    logger.warning('whitelist {0} is not in the correct format. Please provide a list ["10.0.0.0/24","10.0.0.1/24"]'.format(name, clusteruuid))
+
+            return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code).get('value')
+
+        else:
+            raise ValueError('The defined Storage Pool "{0}" was not found on the cluster. Please check inputs and try again.'.format(name))
+
+    def delete_name(self, name, clusteruuid=None):
+        """Delete a specific container by its name in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name for the container.
+        :type name: str
+
+        :returns: `True` if the container was successfully updated, `False` if the update failed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.delete_by_name')
+        container_uuid = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True).get('storage_container_uuid')
+
+        if container_uuid:
+            return self.delete_by_uuid(uuid=container_uuid, clusteruuid=clusteruuid)
+            logger.info('deleted container {0} on cluster {1}'.format(name, clusteruuid))
+        else:
+            logger.warning('container {0} not found on cluster {1}'.format(name, clusteruuid))
+            return False
+
+    def delete_uuid(self, uuid, clusteruuid=None):
+        """Delete a specific container by its UUID in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param uuid: The uuid for the container.
+        :type uuid: str
+
+        :returns: `True` if the container was successfully updated, `False` if the update failed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageContainer.delete_by_uuid')
+        params = {}
+        payload = {}
+        uri = '/storage_containers/{0}'.format(uuid)
+        method = 'DELETE'
+        response_code = 204
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        try:
+            self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code)
+            return True
+
+        except:
+            return False
 
 class StorageVolume(object):
     """A class to represent a Nutanix Clusters Storage Volumes object.
