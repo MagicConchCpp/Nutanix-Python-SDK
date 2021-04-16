@@ -31,6 +31,16 @@ Images
 .. autoclass:: ntnx_api.prism.Images
     :members:
 
+Network
+^^^^^^^
+.. autoclass:: ntnx_api.prism.Network
+    :members:
+
+NetworkSwitch
+^^^^^^^^^^^^^
+.. autoclass:: ntnx_api.prism.NetworkSwitch
+    :members:
+
 StoragePool
 ^^^^^^^^^^^^^^^^
 .. autoclass:: ntnx_api.prism.StoragePool
@@ -3404,7 +3414,7 @@ class StorageContainer(object):
         # Check whether a container with same name already exists
         if not self.search_name(name=name, clusteruuid=clusteruuid, refresh=True):
             payload['name'] = name
-            payload['replication_factor'] = rf
+            payload['replication_factor'] = int(rf)
             payload['oplog_replication_factor'] = oplog_rf
 
             if storage_pool_uuid:
@@ -3414,13 +3424,13 @@ class StorageContainer(object):
                 payload['compression_enabled'] = 'true'
 
             if compression:
-                payload['compression_delay_in_secs'] = compression_delay
+                payload['compression_delay_in_secs'] = int(compression_delay)
 
             if advertised:
-                payload['advertised_capacity'] = advertised
+                payload['advertised_capacity'] = int(advertised)
 
             if reserved:
-                payload['total_explicit_reserved_capacity'] = reserved
+                payload['total_explicit_reserved_capacity'] = int(reserved)
             else:
                 payload['total_explicit_reserved_capacity'] = 0
 
@@ -3428,7 +3438,7 @@ class StorageContainer(object):
                 payload['erasure_code'] = 'on'
 
                 if ecx_delay:
-                    payload['erasure_code_delay_secs'] = ecx_delay
+                    payload['erasure_code_delay_secs'] = int(ecx_delay)
             else:
                 payload['erasure_code'] = 'off'
 
@@ -3516,65 +3526,66 @@ class StorageContainer(object):
                 'true': True,
                 'false': False,
             }
-            if compression != compression_lookup.get(payload.get('compression_enabled')):
-                payload['compression_enabled'] = compression
-                logger.info('setting "compression_enabled" to "{0}"'.format(compression))
-            else:
-                payload['compression_enabled'] = payload.get('compression_enabled')
-                logger.info('leaving "compression_enabled" at its original value of "{0}"'.format(payload.get('compression_enabled')))
+            if compression:
+                if compression != compression_lookup.get(payload.get('compression_enabled')):
+                    payload['compression_enabled'] = compression
+                    logger.info('setting "compression_enabled" to "{0}"'.format(compression))
+                else:
+                    logger.info('leaving "compression_enabled" at its original value of "{0}"'.format(payload.get('compression_enabled')))
 
-            if compression_delay != payload.get('compression_delay_in_secs') and compression:
-                payload['compression_delay_in_secs'] = compression_delay
-                logger.info('setting "compression_delay_in_secs" to "{0}"'.format(compression_delay))
-            else:
-                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
-                logger.info('leaving "compression_delay_in_secs" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
+            if compression_delay:
+                if int(compression_delay) != int(payload.get('compression_delay_in_secs')) and compression:
+                    payload['compression_delay_in_secs'] = int(compression_delay)
+                    logger.info('setting "compression_delay_in_secs" to "{0}"'.format(compression_delay))
+                else:
+                    logger.info('leaving "compression_delay_in_secs" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
 
-            if advertised != payload.get('advertised_capacity'):
-                payload['advertised_capacity'] = advertised
-                logger.info('setting "advertised_capacity" to "{0}"'.format(advertised))
-            else:
-                payload['advertised_capacity'] = payload.get('advertised_capacity')
-                logger.info('leaving "advertised_capacity" at its original value of "{0}"'.format(payload.get('advertised_capacity')))
+            if advertised:
+                if int(advertised) != int(payload.get('advertised_capacity')):
+                    payload['advertised_capacity'] = int(advertised)
+                    logger.info('setting "advertised_capacity" to "{0}"'.format(advertised))
+                else:
+                    logger.info('leaving "advertised_capacity" at its original value of "{0}"'.format(payload.get('advertised_capacity')))
 
-            if reserved != payload.get('total_explicit_reserved_capacity'):
-                payload['total_explicit_reserved_capacity'] = reserved
-                logger.info('setting "total_explicit_reserved_capacity" to "{0}"'.format(reserved))
-            else:
-                payload['total_explicit_reserved_capacity'] = payload.get('total_explicit_reserved_capacity')
-                logger.info('leaving "total_explicit_reserved_capacity" at its original value of "{0}"'.format(payload.get('total_explicit_reserved_capacity')))
+            if reserved:
+                if int(reserved) != int(payload.get('total_explicit_reserved_capacity')):
+                    payload['total_explicit_reserved_capacity'] = int(reserved)
+                    logger.info('setting "total_explicit_reserved_capacity" to "{0}"'.format(reserved))
+                else:
+                    logger.info('leaving "total_explicit_reserved_capacity" at its original value of "{0}"'.format(payload.get('total_explicit_reserved_capacity')))
 
-            if dedupe_cache != payload.get('compression_delay_in_secs'):
-                payload['compression_delay_in_secs'] = compression_delay
-                logger.info('setting "dedupe_cache" to "{0}"'.format(dedupe_cache))
-            else:
-                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
-                logger.info('leaving "dedupe_cache" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
+            if dedupe_cache:
+                if int(dedupe_cache) != int(payload.get('compression_delay_in_secs')):
+                    payload['compression_delay_in_secs'] = int(compression_delay)
+                    logger.info('setting "dedupe_cache" to "{0}"'.format(dedupe_cache))
+                else:
+                    logger.info('leaving "dedupe_cache" at its original value of "{0}"'.format(payload.get('compression_delay_in_secs')))
 
             dedupe_capacity_lookup = {
                 'OFF': False,
                 'NONE': False,
                 'POST_PROCESS': True,
             }
-            if dedupe_capacity != dedupe_capacity_lookup.get(payload.get('on_disk_dedup')):
-                payload['compression_delay_in_secs'] = dedupe_capacity
-                logger.info('setting "on_disk_dedup" to "{0}"'.format(dedupe_capacity))
-            else:
-                payload['compression_delay_in_secs'] = payload.get('compression_delay_in_secs')
-                logger.info('leaving "on_disk_dedup" at its original value of "{0}"'.format(payload.get('on_disk_dedup')))
+            if dedupe_capacity:
+                if dedupe_capacity != dedupe_capacity_lookup.get(payload.get('dedupe_capacity')):
+                    payload['dedupe_capacity'] = dedupe_capacity
+                    logger.info('setting "on_disk_dedup" to "{0}"'.format(dedupe_capacity))
+                else:
+                    logger.info('leaving "dedupe_capacity" at its original value of "{0}"'.format(payload.get('dedupe_capacity')))
 
             ecx_lookup = {
                 'on': True,
                 'off': False,
             }
-            if ecx != ecx_lookup.get(payload.get('erasure_code')):
-                payload['erasure_code'] = 'on'
-            else:
-                payload['erasure_code'] = 'off'
+            if ecx:
+                if ecx != ecx_lookup.get(payload.get('erasure_code')):
+                    payload['erasure_code'] = 'on'
+                else:
+                    payload['erasure_code'] = 'off'
 
             if ecx_delay:
-                if ecx_delay != payload['erasure_code_delay_secs']:
-                    payload['erasure_code_delay_secs'] = ecx_delay
+                if int(ecx_delay) != int(payload['erasure_code_delay_secs']):
+                    payload['erasure_code_delay_secs'] = int(ecx_delay)
 
             if whitelist:
                 if isinstance(whitelist, list):
@@ -3638,6 +3649,7 @@ class StorageContainer(object):
 
         except:
             return False
+
 
 class StorageVolume(object):
     """A class to represent a Nutanix Clusters Storage Volumes object.
@@ -3835,3 +3847,477 @@ class Task(object):
                 logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('progress_status').lower()))
         self.task_result[task_uuid] = task_status
         self.task_status.set()
+
+class NetworkSwitch(object):
+    """A class to represent a Nutanix Cluster AHV vSwitch object.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+    def __init__(self, api_client):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.NetworkSwitch.__init__')
+        self.api_client = api_client
+        self.task_status = threading.Event()
+        self.task_result = {}
+        self.bridges = {}
+
+    def get(self, clusteruuid=None):
+        """Retrieve data for each vSwitch in a specific AHV cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+
+        :returns: A list of dictionaries describing each network from the specified cluster.
+        :rtype: ResponseList
+        """
+        logger = logging.getLogger('ntnx_api.prism.NetworkSwitch.get')
+
+        # Remove existing data for this cluster if it exists
+        if self.bridges.get(clusteruuid):
+            self.bridges.pop(clusteruuid)
+            logger.info('removing existing data from class dict self.networks for cluster {0}'.format(clusteruuid))
+
+        params = {}
+        payload = {
+            "entity_type": "virtual_switch",
+            "group_member_attributes": [{"attribute": "name"}],
+            "group_member_count": 1000,
+            "group_member_offset": 0,
+            "query_name": "prism:EBQueryModel"
+        }
+        uri = '/groups'
+        method = 'POST'
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        bridges = []
+        group_results = self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params, method=method).get('group_results')
+        for group_result in group_results:
+            for entity in group_result.get('entity_results'):
+                for data in entity.get('data'):
+                    if data.get('name') == 'name':
+                        for values in data.get('values'):
+                            for value in values.get('values'):
+                                bridges.append(value)
+        self.bridges[clusteruuid] = list(set(bridges))
+        return self.bridges[clusteruuid]
+
+    def search_name(self, name, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific network vSwitch, in a specific cluster by name
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: A storage pool name to search for.
+        :type name: str, optional
+
+        :returns: A dictionary describing the found storage pool.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.NetworkSwitch.search_name')
+        # found = {}
+        if not self.bridges.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        found = next((item for item in self.bridges.get(clusteruuid) if item == name), None)
+
+        return found
+
+
+class Network(object):
+    """A class to represent a Nutanix Cluster AHV Network object.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+
+    def __init__(self, api_client):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.__init__')
+        self.api_client = api_client
+        self.task_status = threading.Event()
+        self.task_result = {}
+        self.networks = {}
+
+    def get(self, clusteruuid=None):
+        """Retrieve data for each network in a specific cluster
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+
+        :returns: A list of dictionaries describing each network from the specified cluster.
+        :rtype: ResponseList
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.get')
+
+        # Remove existing data for this cluster if it exists
+        if self.networks.get(clusteruuid):
+            self.networks.pop(clusteruuid)
+            logger.info('removing existing data from class dict self.networks for cluster {0}'.format(clusteruuid))
+
+        params = {}
+        payload = None
+        uri = '/networks'
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        self.networks[clusteruuid] = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params).get('entities')
+        logger.info('cluster {0} has networks {1}'.format(clusteruuid, self.networks[clusteruuid]))
+        return self.networks[clusteruuid]
+
+    def search_uuid(self, uuid, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific network, in a specific cluster by uuid
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param uuid: A network uuid to search for.
+        :type uuid: str, optional
+        :returns: A dictionary describing the found network.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.search_uuid')
+        if not self.networks.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        return next((item for item in self.networks.get(clusteruuid) if item.get("uuid") == uuid), None)
+
+    def search_name(self, name, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific network, in a specific cluster by uuid
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: A network name to search for.
+        :type name: str, optional
+
+        :returns: A dictionary describing the found network.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.search_name')
+        if not self.networks.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        return next((item for item in self.networks.get(clusteruuid) if item.get("name") == name), None)
+
+    def search_vlan(self, vlan, clusteruuid=None, refresh=False):
+        """Retrieve data for a specific vlan, in a specific cluster by uuid
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param vlan: A vlan to search for.
+        :type vlan: str, optional
+
+        :returns: A dictionary describing the found network.
+        :rtype: ResponseDict
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.search_vlan')
+        if not self.networks.get(clusteruuid) or refresh:
+            self.get(clusteruuid)
+
+        return next((item for item in self.networks.get(clusteruuid) if item.get("vlan_id") == vlan), None)
+
+    def create(self, name, vlan=0, vswitch='br0', network_address=None, network_cidr=None, default_gw=None, dhcp_boot_filename=None, dhcp_domain_name=None,
+               dhcp_domain_nameservers=None, dhcp_domain_search=None, dhcp_tftp_server_name=None, dhcp_server_override=None, dhcp_pools=None, clusteruuid=None):
+        """Create a new network on a specified vSwitch
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name of the network to create.
+        :type name: str
+        :param vlan: The vlan id of the network to be created. To select the native VLAN set this value to 0. (default=0)
+        :type vlan: int, optional
+        :param vswitch: The name of the vswitch on which to create the network. (default='br0')
+        :type vswitch: str, optional
+        :param network_address: The network address for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type network_address: str, optional
+        :param network_cidr: The CIDR for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type network_cidr: int, optional
+        :param default_gw: The default gateway for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type default_gw: str, optional
+        :param dhcp_boot_filename: The default gateway for the network being created.
+        :type dhcp_boot_filename: str, optional
+        :param dhcp_domain_name:
+        :type dhcp_domain_name: str, optional
+        :param dhcp_domain_nameservers:
+        :type dhcp_domain_nameservers: str, optional
+        :param dhcp_domain_search:
+        :type dhcp_domain_search: str, optional
+        :param dhcp_tftp_server_name:
+        :type dhcp_tftp_server_name: str, optional
+        :param dhcp_server_override:
+        :type dhcp_server_override: str, optional
+        :param dhcp_pools: A list of dicts describing the ip pool ranges to create. Each dict should be in the format {"start": "w.x.y.z", "end": ""w.x.y.z"}.
+        :type dhcp_pools: list, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.create')
+
+        params = {}
+        payload = {}
+        ip_config = {}
+        dhcp_options = {}
+        uri = '/networks'
+        method = 'POST'
+        response_code = 201
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        network_vswitch_obj = NetworkSwitch(api_client=self.api_client)
+        vswitch_search = network_vswitch_obj.search_name(name=vswitch, clusteruuid=clusteruuid, refresh=True)
+        network_search = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+
+        ipam = False
+        if not all(v is None for v in [network_address, network_cidr, default_gw]):
+            if not all(v is not None for v in [network_address, network_cidr, default_gw]):
+                raise ValueError('To enable IPAM "network_address", "network_cidr" and "default_gw" are all required. Please check inputs and try again.')
+            else:
+                ipam = True
+                existing_vlan = self.search_vlan(vlan=vlan, clusteruuid=clusteruuid, refresh=True)
+                if existing_vlan:
+                    if existing_vlan.get('ip_config').get('network_address'):
+                        raise ValueError('Another network configured with VLAN "{0}" already has IPAM enabled. Please check inputs and try again'.format(vlan))
+
+        if not vswitch_search:
+            raise ValueError('The provided vSwitch name "{0}" is not present on this cluster. Please check inputs and try again'.format(vswitch))
+
+        if not network_search:
+            payload['name'] = name
+            payload['vlan_id'] = vlan
+            payload['vswitch_name'] = vswitch
+
+            if ipam:
+                ip_config['network_address'] = network_address
+                ip_config['prefix_length'] = network_cidr
+                ip_config['default_gateway'] = default_gw
+
+                if dhcp_server_override:
+                    ip_config['dhcp_server_address'] = dhcp_server_override
+
+                if dhcp_boot_filename:
+                    dhcp_options['boot_file_name'] = dhcp_boot_filename
+                else:
+                    dhcp_options['boot_file_name'] = ''
+
+                if dhcp_domain_name:
+                    dhcp_options['domain_name'] = dhcp_domain_name
+                else:
+                    dhcp_options['domain_name'] = ''
+
+                if dhcp_domain_nameservers:
+                    dhcp_options['domain_name_servers'] = dhcp_domain_nameservers
+                else:
+                    dhcp_options['domain_name_servers'] = ''
+
+                if dhcp_domain_search:
+                    dhcp_options['domain_search'] = dhcp_domain_search
+                else:
+                    dhcp_options['domain_search'] = ''
+
+                if dhcp_tftp_server_name:
+                    dhcp_options['tftp_server_name'] = dhcp_tftp_server_name
+                else:
+                    dhcp_options['tftp_server_name'] = ''
+
+                ip_config['dhcp_options'] = dhcp_options
+
+                pools = []
+                for dhcp_pool in dhcp_pools:
+                    if dhcp_pool.get('start') and dhcp_pool.get('end'):
+                        ip_range = {
+                            'range': "{0} {1}".format(dhcp_pool.get('start'),dhcp_pool.get('end'))
+                        }
+                        pools.append(ip_range)
+                ip_config['pool'] = pools
+
+                payload['ip_config'] = ip_config
+
+            logger.info('payload of network to be created: {0}'.format(payload))
+            return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code).get('network_uuid')
+
+        else:
+            raise ValueError('A network "{0}" with the same name already exists on this cluster. Please check inputs and try again.'.format(name))
+
+    def update(self, name, vlan=None, network_address=None, network_cidr=None, default_gw=None, dhcp_boot_filename=None, dhcp_domain_name=None,
+               dhcp_domain_nameservers=None, dhcp_domain_search=None, dhcp_tftp_server_name=None, dhcp_server_override=None, dhcp_pools=None, clusteruuid=None):
+        """Update the configuration of an existing network.
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name of the network to update.
+        :type name: str
+        :param vlan: The vlan id of the network to be created. To select the native VLAN set this value to 0. (default=0)
+        :type vlan: int, optional
+        :param network_address: The network address for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type network_address: str, optional
+        :param network_cidr: The CIDR for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type network_cidr: int, optional
+        :param default_gw: The default gateway for the network being created. This is required to enable IP Address Management (IPAM) within AHV.
+        :type default_gw: str, optional
+        :param dhcp_boot_filename: The default gateway for the network being created.
+        :type dhcp_boot_filename: str, optional
+        :param dhcp_domain_name:
+        :type dhcp_domain_name: str, optional
+        :param dhcp_domain_nameservers:
+        :type dhcp_domain_nameservers: str, optional
+        :param dhcp_domain_search:
+        :type dhcp_domain_search: str, optional
+        :param dhcp_tftp_server_name:
+        :type dhcp_tftp_server_name: str, optional
+        :param dhcp_server_override:
+        :type dhcp_server_override: str, optional
+        :param dhcp_pools: A list of dicts describing the ip pool ranges to create. Each dict should be in the format {"start": "w.x.y.z", "end": ""w.x.y.z"}.
+        :type dhcp_pools: list, optional
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.update')
+        params = {}
+        method = 'PUT'
+        response_code = 200
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        payload = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        uri = '/networks/{0}'.format(payload.get('uuid'))
+        logger.info('found network to update: {0}'.format(payload))
+
+        configured_ipam = False
+        if payload.get('ip_config'):
+            if payload.get('ip_config').get('network_address') and payload.get('ip_config').get('default_gateway') \
+                    and payload.get('ip_config').get('prefix_length') > 0:
+                configured_ipam = True
+            else:
+                payload.pop('ip_config')
+
+        config_ipam = False
+        if not all(v is None for v in [network_address, network_cidr, default_gw]):
+            if not all(v is not None for v in [network_address, network_cidr, default_gw]):
+                raise ValueError('To enable IPAM "network_address", "network_cidr" and "default_gw" are all required. Please check inputs and try again.')
+            else:
+                config_ipam = True
+                existing_vlan = self.search_vlan(vlan=vlan, clusteruuid=clusteruuid, refresh=True)
+                if existing_vlan:
+                    if existing_vlan.get('ip_config').get('network_address'):
+                        raise ValueError('Another network configured with VLAN "{0}" already has IPAM enabled. Please check inputs and try again'.format(vlan))
+
+        if payload:
+            remove_keys = [
+                'logical_timestamp',
+            ]
+            for key in remove_keys:
+                payload.pop(key)
+
+            if vlan:
+                if payload.get('vlan') != vlan:
+                    payload['vlan_id'] = vlan
+                else:
+                    payload.pop('vlan_id')
+
+            if config_ipam or configured_ipam:
+                if not payload.get('ip_config'):
+                    payload['ip_config'] = {}
+
+                if dhcp_server_override:
+                    if payload.get('ip_config').get('dhcp_server_address') != dhcp_server_override:
+                        payload['ip_config']['dhcp_server_address'] = dhcp_server_override
+
+                if network_address:
+                    if payload.get('ip_config').get('network_address') != network_address:
+                        payload['ip_config']['network_address'] = network_address
+
+                if network_cidr:
+                    if payload.get('ip_config').get('prefix_length') != network_cidr:
+                        payload['ip_config']['prefix_length'] = network_cidr
+
+                if default_gw:
+                    if payload.get('ip_config').get('default_gateway') != default_gw:
+                        payload['ip_config']['default_gateway'] = default_gw
+
+                if dhcp_boot_filename:
+                    if payload.get('ip_config').get('boot_file_name') != dhcp_boot_filename :
+                        payload['ip_config']['boot_file_name'] = dhcp_boot_filename
+
+                if dhcp_domain_name:
+                    if payload.get('ip_config').get('domain_name') != dhcp_domain_name:
+                        payload['ip_config']['domain_name'] = dhcp_domain_name
+
+                if dhcp_domain_search:
+                    if payload.get('ip_config').get('domain_search') != dhcp_domain_search:
+                        payload['ip_config']['domain_name_servers'] = dhcp_domain_nameservers
+
+                if dhcp_tftp_server_name:
+                    if payload.get('ip_config').get('tftp_server_name') != dhcp_tftp_server_name:
+                        payload['ip_config']['tftp_server_name'] = dhcp_tftp_server_name
+
+                if dhcp_domain_search:
+                    if payload.get('ip_config').get('domain_search') != dhcp_domain_search:
+                        payload['ip_config']['domain_search'] = dhcp_domain_search
+
+                if dhcp_pools:
+                    if payload.get('ip_config').get('pool') and dhcp_pools:
+                        pools = []
+                        for dhcp_pool in dhcp_pools:
+                            if dhcp_pool.get('start') and dhcp_pool.get('end'):
+                                ip_range = {
+                                    'range': "{0} {1}".format(dhcp_pool.get('start'), dhcp_pool.get('end'))
+                                }
+                                pools.append(ip_range)
+                        payload['ip_config']['pool'] = pools
+
+            logger.info('payload of network to be updated: {0}'.format(payload))
+            return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code).get('value')
+
+        else:
+            raise ValueError('The network "{0}" does not exist on this cluster. Please check inputs and try again.'.format(name))
+
+    def delete_name(self, name, clusteruuid=None):
+        """Delete an existing network by name.
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param name: The name of the network to delete.
+        :type name: str
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.delete')
+        network = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
+        if network:
+            return self.delete_uuid(network.get('uuid'))
+        else:
+            return False
+
+    def delete_uuid(self, uuid, clusteruuid=None):
+        """Delete an existing network by uuid.
+
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :param uuid: The uuid of the network to delete.
+        :type uuid: str
+        """
+        logger = logging.getLogger('ntnx_api.prism.Network.delete')
+        params = {}
+        payload = {}
+        uri = '/networks/{0}'.format(uuid)
+        method = 'DELETE'
+        response_code = 204
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        try:
+            self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code)
+            return True
+
+        except:
+            return False
