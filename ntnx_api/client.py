@@ -610,7 +610,7 @@ class PrismApi(object):
                                         data=data, params=params)
 
             logger.debug('api response code: {0}'.format(response.status_code))
-            logger.debug('api response: {0}'.format(response.json()))
+            logger.info('api response: {0}'.format(response.json()))
 
         except requests.exceptions.HTTPError:
             raise NutanixRestHTTPError(request_url, str(api_version), '', params, response)
