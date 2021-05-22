@@ -24,7 +24,7 @@ Hosts
 Vms
 ^^^
 .. autoclass:: ntnx_api.prism.Vms
-    :members:
+   :members:
 
 Images
 ^^^^^^
@@ -67,6 +67,8 @@ from random import random
 import threading
 import paramiko
 import os
+import bitmath
+import base64
 
 __metaclass__ = type
 
@@ -2856,6 +2858,1691 @@ class Vms(object):
                             protection_rules[key] = value
         return protection_rules
 
+    @staticmethod
+    def _vm_disk_spec(bus:str='scsi', label:str=None, index:int=0, flash_mode:bool=False, size_gb:int=0, image_uuid:str=None, storage_container_uuid:str=None,
+                      volume_group_uuid:str=None, **kwargs):
+        """Generate the disk configuration when creating a VM for the v2 API.
+        :param bus: The bus type to be used to attached the vdisk to the vm (default=scsi)
+        :type bus: str('scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme')
+        :param label: (default=None)
+        :type label: str, optional
+        :param index: The SCSI bus index where the vdisk will be attached to the vm (default=0)
+        :type index: int, optional
+        :param flash_mode: Whether flash mode will be enabled on this vdisk. For more detail on flash mode refer to
+                            https://portal.nutanix.com/page/documents/details?targetId=Web-Console-Guide-Prism-v5_19:wc-vm-flash-mode-c.html (default=False)
+        :type flash_mode: bool, optional
+        :param size_gb: The size of the vdisk in GB (default=0)
+        :type size_gb: int, optional
+        :param image_uuid: The uuid of an existing image that this vdisk will be built from. (default=None)
+        :type image_uuid: str, optional
+        :param storage_container_uuid: The uuid of an existing storage container that a new vdisk will be built on. (default=None)
+        :type storage_container_uuid: str, optional
+        :param volume_group_uuid: The uuid of an existing volume group that will be attached to at the specified SCSI bus index. (default=None)
+        :type volume_group_uuid: str, optional
+        :return: A dictionary containing the specification to be used to create a vm disk
+        :rtype: dict
+        ... warning:: Only one of image_uuid, storage_container_uuid or volume_group_uuid must be provided.
+        """
+
+        if bus.lower() not in ['scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme', ]:
+            raise ValueError()
+
+        bm_size_gb = bitmath.GiB(size_gb)
+        bm_size = bm_size_gb.to_Byte()
+
+        disk = {
+            'disk_address': {
+                'device_bus': bus.upper(),
+                'device_index': index,
+                'is_cdrom': False,
+            },
+            'flash_mode_enabled': flash_mode,
+            'is_cdrom': False,
+        }
+
+        if label:
+            disk['disk_address']['disk_label'] = label
+
+        if image_uuid:
+            disk['is_empty'] = False
+            disk['vm_disk_clone'] = {
+                'disk_address': {
+                    'vmdisk_uuid': image_uuid,
+                },
+                # 'storage_container_uuid': '',
+            }
+
+            if size_gb:
+                disk['vm_disk_clone']['minimum_size'] = int(bm_size)
+
+        elif volume_group_uuid:
+            disk['is_empty'] = False
+            disk['disk_address']['volume_group_uuid'] = volume_group_uuid
+
+        else:
+            if size_gb:
+                disk['is_empty'] = False
+                disk['vm_disk_create'] = {
+                    'size': int(bm_size),
+                    'storage_container_uuid': storage_container_uuid,
+                }
+
+            else:
+                disk['is_empty'] = True
+
+        return disk
+
+    @staticmethod
+    def _vm_nic_spec(network_uuid=None, adaptor_type:str='E1000', connect:bool=True, mac_address:str=None, model:str=None, ipam:bool=False,
+                     requested_ip_address:str=None, **kwargs):
+        """Generate the network interface configuration when creating a VM for the v2 API.
+        :param network_uuid: The uuid of an existing network that a new vdisk will be built on. (default=None)
+        :type network_uuid: str, optional
+        :param adaptor_type: The type of network interface that is being created (default='e1000')
+        :type adaptor_type: str('e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3', 'unsupported'), optional
+        :param connect: Whether to connect the network interface (equivalent of whether the network cable is plugged in or not). (default=True)
+        :type connect: bool, optional
+        :param mac_address: Whether to use a custom mac address. By default a new MAC address will be generated for this network interface (default=None)
+        :type mac_address: str, optional
+        :param model: TDB (default=None)
+        :type model: str, optional
+        :param ipam: Whether to enable AHV IPAM on this network interface. (default=False)
+        :type ipam: bool, optional
+        :param requested_ip_address: If AHV IPAM is enabled specify the IP address that will be assigned to this network interface. (default=None)
+        :type requested_ip_address: str, optional
+        :return: A dictionary containing the specification to be used to create a vm network interface
+        :rtype: dict
+        .. todo:: Determine the acceptable values for the model parameter & update documentation and add validation for the variable.
+        """
+        if not network_uuid:
+            raise ValueError()
+
+        if adaptor_type.lower() not in ['e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3', 'unsupported', ]:
+            raise ValueError()
+
+        nic = {
+            'adaptor_type': adaptor_type.upper(),
+            'is_connected': connect,
+            'network_uuid': network_uuid,
+        }
+
+        if mac_address:
+            nic['mac_address'] = mac_address
+
+        if model:
+            nic['model'] = model
+
+        if ipam:
+            nic['request_ip'] = True
+
+        if requested_ip_address:
+            nic['request_ip'] = True
+            nic['requested_ip_address'] = requested_ip_address
+
+        return nic
+
+    @staticmethod
+    def _vm_gpu_spec(device_id:int=None, gpu_type:str='pass_through_graphics', gpu_vendor:str='nvidia', **kwargs):
+        """Generate the gpu configuration when creating a VM for the v2 API.
+        :param device_id: The GPU device ID. (default=None)
+        :type device_id: str, optional
+        :param gpu_type: The type of GPU that is to be added to the VM (default='pass_through_graphics')
+        :type gpu_type: str('pass_through_graphics'), optional
+        :param gpu_vendor: The GPU vendor that is to be added to the VM. (default='nvidia')
+        :type gpu_vendor: str('nvidia'), optional
+        :return: A dictionary containing the specification to be used to create a vm gpu
+        :rtype: dict
+        """
+        if not device_id:
+            raise ValueError()
+
+        if gpu_type.lower() not in ['pass_through_graphics', ]:
+            raise ValueError()
+
+        if gpu_vendor.lower() not in ['nvidia', ]:
+            raise ValueError()
+
+        gpu = {
+            'device_id': device_id,
+            'gpu_type': gpu_type.upper(),
+            'gpu_vendor': gpu_vendor.upper(),
+        }
+
+        return gpu
+
+    @staticmethod
+    def _vm_serial_port_spec(port_index:int=None, port_type:str='null', **kwargs):
+        """Generate the serial port configuration when creating a VM for the v2 API.
+        :param port_index: The serial port device index. (default=None)
+        :type port_index: str, optional
+        :param port_type: The type of serial port that is to be added to the VM (default='null')
+        :type port_type: str('null', 'server'), optional
+        :return: A dictionary containing the specification to be used to create a vm serial port
+        :rtype: dict
+        """
+        if not port_index >= 0:
+            raise ValueError()
+
+        if port_type.lower() not in ['null', 'server', ]:
+            raise ValueError()
+
+        serial_port = {
+            'index': port_index,
+            'type': port_type.upper(),
+        }
+
+        return serial_port
+
+    def create(self, name:str, vcpus:int, memory_gb:int, sockets:int=1, vcpu_reservation_hz:int=0, memory_reservation_gb:int=0, description:str='',
+                  power_state:str='on', disks:list=[], storage_container_uuid:str=None, nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str='UTC',
+                  sysprep:str=None, cloudinit:str=None, add_cdrom:bool=True, ha_priority:int=0, machine_type:str='pc', wait:bool=True, clusteruuid:str=None):
+        """ Create a new virtual machine.
+
+        :param name: The name for the VM to be created. VM names do not have to be unique.
+        :type name: str
+        :param description: A description for the VM (default='')
+        :type description: str, optional
+        :param vcpus: The number of vCPUs to be assigned to this VM
+        :type vcpus: int
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
+        :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
+        :type sockets: int, optional
+        :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type vcpu_reservation_hz: int, optional
+        :param memory_reservation_gb: An amount of memory to lock to this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type memory_reservation_gb: int, optional
+        :param power_state: The desired power state for this VM after creation. (default='on')
+        :type power_state: str('on', 'off'), optional
+        :param storage_container_uuid: The UUID of the storage contain on which to create this VM. Only applicable on the ESXi hypervisor. (default='null')
+        :type storage_container_uuid: str, optional
+        :param add_cdrom: Whether to add a cdrom drive to this VM (default=True)
+        :type add_cdrom: bool, optional
+        :param disks: A list of vdisks dicts to be added to this VM (default='null').
+
+            The dictionary format per-vDisk is as follows::
+                - bus (str, optional, default='scsi'). The bus to use for the vDisk. Choice of 'scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme'
+                - size_gb (int, optional). Size of vDisk in GB. Use this when creating a new disk or cloning from an image. Can be used to increase the size of vDisk created from an image
+                - storage_container_name (str, optional). Name of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_uuid"
+                - storage_container_uuid (str, optional). UUID of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_name"
+                - image_name (str, optional). Name of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_uuid"
+                - image_uuid (str, optional). UUID of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_name"
+                - volume_group_name (str, optional). Name of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_uuid"
+                - volume_group_uuid (str, optional). UUID of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_name"
+                - flash_mode (bool, optional, default=False). True or False
+                - label (str, optional). Unknown
+
+            Examples;
+                1. Add a single virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, ]
+                2. Add multiple virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, {'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 200, }, ]
+                3. Add a single virtual disk with flash mode enabled - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 15, 'flash_mode': True}, ]
+                4. Add a single virtual disk from an image - [{'bus': 'scsi', 'image_name': 'centos8', }, ]
+                5. Add a single virtual disk from an image with a new minimum size - [{'bus': 'scsi', 'image_name': 'centos8', 'size_gb': 500, }, ]
+                6. Add a volume group - [{'bus': 'scsi', 'volume_group_name': 'volume_group_database1', }, ]
+        :type disks: list, optional
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param gpus: A list of GPU dicts to be added to the VM (default='null')
+
+            The dictionary format per-GPU is as follows::
+                - device_id (int).
+                - gpu_type (str, optional, default='null'). The type of GPU to add. Choice of 'pass_through_graphics'
+                - gpu_vendor (str, optional, default='null'). The GPU vendor to add. Choice of 'nvidia',
+        :type gpus: list, optional
+        :param serial_ports: A list of serial port dicts to be added to the VM (default='null')
+
+            The dictionary format per-serial port is as follows::
+                - port_index (int).
+                - port_type (str, optional, default='null'). The type of serial port to add. Choice of 'null', 'server'
+        :type serial_ports: list, optional
+        :param timezone: The timezone for the virtual machine (default='UTC').
+        :type timezone: str, optional
+        :param sysprep: The sysprep XML string to use to customize this VM upon first power on. Only applicable for AHV and a Windows OS. (default='null')
+        :type sysprep: str, optional
+        :param cloudinit: The cloudinit text string to use to customize this VM upon first power on. Only applicable for AHV and a Linux OS. (default='null')
+        :type cloudinit: str, optional
+        :param ha_priority: VM HA priority. Only applicable to ESXi hypervisor (default=0)
+        :type ha_priority: int, optional
+        :param machine_type: The type of VM being deployed. This donates the target cpu architecture of the cluster. (default='pc')
+        :type machine_type: str('pc', 'pseries', 'q35'), optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the VM was sucessfully created.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.create')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms'
+        method = 'POST'
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        bm_memory_gb = bitmath.GB(memory_gb)
+        bm_memory_mb = bm_memory_gb.to_MB()
+        bm_memory_reservation_mb = bitmath.GB(memory_reservation_gb)
+        bm_memory_reservation_mb = bm_memory_reservation_mb.to_MB()
+        vg_attach = []
+
+        if power_state not in ["off", "on", ]:
+            raise ValueError()
+
+        if machine_type not in ["pc", "pseries", "q35",]:
+            raise ValueError()
+
+        payload = {
+            'name': name,
+            'description': description,
+            'memory_mb': int(bm_memory_mb),
+            'sockets': sockets,
+            'num_vcpus': (vcpus/sockets),
+            'power_state': 'OFF',
+            'timezone': timezone,
+            'ha_priority': ha_priority,
+            'machine_type': machine_type,
+            'vm_disks': [],
+            'vm_nics': [],
+        }
+
+        if vcpu_reservation_hz:
+            payload['vcpu_reservation_hz'] = vcpu_reservation_hz
+
+        if memory_reservation_gb:
+            payload['memory_reservation_mb'] = int(bm_memory_reservation_mb)
+
+        if storage_container_uuid:
+            containers_obj = StorageContainer(api_client=self.api_client)
+            container = containers_obj.search_uuid(uuid=storage_container_uuid, clusteruuid=clusteruuid)
+            if container:
+                logger.info('found container with uuid "{0}"'.format(storage_container_uuid))
+                payload['storage_container_uuid'] = container.get('storage_container_uuid')
+            else:
+                logger.warning('cannot find container with uuid "{0}"'.format(storage_container_uuid))
+                raise ValueError()
+
+        device_indexes = {
+            'ide': 0,
+            'scsi': 0,
+            'pci': 0,
+            'sata': 0,
+            'spapr': 0,
+            'nvme': 0,
+        }
+        if add_cdrom:
+            cdrom_config = {
+                'is_cdrom': True,
+                'is_empty': True,
+                'disk_address': {
+                    'device_bus': 'IDE',
+                    'device_index': device_indexes['ide'],
+                    'is_cdrom': True,
+                }
+            }
+            device_indexes['ide'] += 1
+            payload['vm_disks'].append(cdrom_config)
+
+        for disk in disks:
+            disk['index'] = device_indexes[disk.get('bus', 'scsi')]
+            device_indexes[disk.get('bus', 'scsi')] += 1
+
+            if any([disk.get('storage_container_name'), disk.get('storage_container_uuid')]) and any([disk.get('image_name'), disk.get('image_uuid')]) and \
+                    any([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                raise ValueError()
+
+            elif any([disk.get('storage_container_name'), disk.get('storage_container_uuid')]):
+                if all([disk.get('storage_container_name'), disk.get('storage_container_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('storage_container_name'):
+                    logger.debug('searching for container named "{0}"'.format(disk.get('storage_container_name')))
+                    containers_obj = StorageContainer(api_client=self.api_client)
+                    container = containers_obj.search_name(name=disk.get('storage_container_name'), clusteruuid=clusteruuid)
+                    if container:
+                        logger.debug('found container named "{0}"'.format(disk.get('storage_container_name')))
+                        disk.pop('storage_container_name')
+                        disk['storage_container_uuid'] = container.get('storage_container_uuid')
+                    else:
+                        logger.warning('cannot find container named "{0}"'.format(disk.get('storage_container_name')))
+                        raise ValueError()
+
+                elif disk.get('storage_container_uuid'):
+                    logger.debug('searching for container "{0}"'.format(disk.get('storage_container_uuid')))
+                    containers_obj = StorageContainer(api_client=self.api_client)
+                    container = containers_obj.search_uuid(uuid=disk.get('storage_container_uuid'), clusteruuid=clusteruuid)
+                    if container:
+                        logger.debug('found container "{0}"'.format(disk.get('storage_container_uuid')))
+                        disk.pop('storage_container_name')
+                        disk['storage_container_uuid'] = disk.get('storage_container_uuid')
+                    else:
+                        logger.warning('cannot find container "{0}"'.format(disk.get('storage_container_uuid')))
+                        raise ValueError()
+
+            elif any([disk.get('image_name'), disk.get('image_uuid')]):
+                if all([disk.get('image_name'), disk.get('image_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('image_name'):
+                    logger.debug('searching for image named "{0}"'.format(disk.get('image_name')))
+                    images_obj = Images(api_client=self.api_client)
+                    image = images_obj.search_name(name=disk.get('image_name'), clusteruuid=clusteruuid)
+                    if image:
+                        logger.debug('found image named "{0}"'.format(disk.get('image_name')))
+                        disk.pop('image_name')
+                        disk['image_uuid'] = image.get('vm_disk_id')
+                    else:
+                        logger.warning('cannot find image named "{0}"'.format(disk.get('image_name')))
+                        raise ValueError()
+
+                elif disk.get('image_uuid'):
+                    logger.info('searching for image "{0}"'.format(disk.get('image_uuid')))
+                    images_obj = Images(api_client=self.api_client)
+                    image = images_obj.search_uuid(uuid=disk.get('image_uuid'), clusteruuid=clusteruuid)
+                    if image:
+                        logger.debug('found image "{0}"'.format(disk.get('image_uuid')))
+                        disk.pop('image_uuid')
+                        disk['image_uuid'] = image.get('vm_disk_id')
+                    else:
+                        logger.warning('cannot find image "{0}"'.format(disk.get('image_uuid')))
+                        raise ValueError()
+
+            elif any([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                if all([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('volume_group_name'):
+                    logger.info('searching for volume group named "{0}"'.format(disk.get('volume_group_name')))
+                    volume_group_obj = StorageVolume(api_client=self.api_client)
+                    volume_group = volume_group_obj.search_volume_groups_name(name=disk.get('volume_group_name'), clusteruuid=clusteruuid)
+                    if volume_group:
+                        logger.debug('found volume group named "{0}"'.format(disk.get('volume_group_name')))
+                        disk.pop('volume_group_name')
+                        vg = {
+                            'index': disk['index'],
+                            'uuid': volume_group.get('uuid'),
+                        }
+                        vg_attach.append(vg)
+
+                    else:
+                        logger.warning('cannot find volume group named "{0}"'.format(disk.get('volume_group_name')))
+                        raise ValueError()
+
+                elif disk.get('volume_group_uuid'):
+                    logger.info('searching for volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                    volume_group_obj = StorageVolume(api_client=self.api_client)
+                    volume_group = volume_group_obj.search_volume_groups_uuid(uuid=disk.get('volume_group_uuid'), clusteruuid=clusteruuid)
+                    if volume_group:
+                        logger.debug('found volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                        disk.pop('volume_group_uuid')
+                        vg = {
+                            'index': disk['index'],
+                            'uuid': volume_group.get('uuid'),
+                        }
+                        vg_attach.append(vg)
+                    else:
+                        logger.warning('cannot find volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                        raise ValueError()
+
+            if any([disk.get('storage_container_name'), disk.get('storage_container_uuid'), disk.get('image_name'), disk.get('image_uuid'), ]):
+                disk_spec = self._vm_disk_spec(**disk)
+                payload['vm_disks'].append(disk_spec)
+
+        for nic in nics:
+            if all([nic.get('network_uuid'), nic.get('network_name')]):
+                raise ValueError()
+
+            elif nic.get('network_name'):
+                logger.info('searching for network named "{0}"'.format(nic.get('network_name')))
+                networks_obj = Network(api_client=self.api_client)
+                network = networks_obj.search_name(name=nic.get('network_name'), clusteruuid=clusteruuid)
+                if network:
+                    logger.debug('found network named "{0}"'.format(nic.get('network_name')))
+                    nic.pop('network_name')
+                    nic['network_uuid'] = network.get('uuid')
+                else:
+                    logger.warning('cannot find network named "{0}"'.format(nic.get('network_name')))
+                    raise ValueError()
+
+            elif nic.get('network_uuid'):
+                logger.info('searching for network "{0}"'.format(nic.get('network_uuid')))
+                networks_obj = Network(api_client=self.api_client)
+                network = networks_obj.search_uuid(uuid=nic.get('network_uuid'), clusteruuid=clusteruuid)
+                if network:
+                    logger.debug('found network named "{0}"'.format(nic.get('network_uuid')))
+                    nic.pop('network_uuid')
+                    nic['network_uuid'] = nic.get('network_uuid')
+                else:
+                    logger.warning('cannot find network named "{0}"'.format(nic.get('network_uuid')))
+                    raise ValueError()
+
+            payload['vm_nics'].append(self._vm_nic_spec(**nic))
+
+        for gpu in gpus:
+            payload['vm_gpus'] = []
+            payload['vm_gpus'].append(self._vm_gpu_spec(**gpu))
+
+        for serial_port in serial_ports:
+            payload['serial_ports'] = []
+            payload['serial_ports'].append(self._vm_serial_port_spec(**serial_port))
+
+        if all([sysprep, cloudinit]):
+            raise ValueError('Pleae provide either sysprep or cloudinit NOT both.')
+
+        elif sysprep:
+            payload['vm_customization_config'] = {
+                'fresh_install': False,
+                'userdata': sysprep,
+            }
+
+        elif cloudinit:
+            payload['vm_customization_config'] = {
+                'fresh_install': False,
+                'userdata': cloudinit,
+            }
+
+        logger.debug('vm to be created: "{0}"'.format(payload))
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        task_uuid = task.get('task_uuid')
+
+        if wait:
+            if task_uuid:
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task_uuid, max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task_uuid].get('progress_status').lower() == 'succeeded':
+                    logger.debug('vm creation successful')
+
+                    if vg_attach:
+                        for vm in task_obj.task_result[task_uuid].get('entity_list'):
+                            for vg in vg_attach:
+                                self.attach_vg(vm_uuid=vm.get('entity_id'), wait=wait, clusteruuid=clusteruuid, **vg)
+
+                    if power_state == 'on':
+                        for vm in task_obj.task_result[task_uuid].get('entity_list'):
+                            power_state = self.power_state(uuid=vm.get('entity_id'), desired_state='on', wait=wait, clusteruuid=clusteruuid)
+                            if power_state:
+                                return True
+                            else:
+                                logger.warning('vm creation failed ,cleaning up VM. Task details: {0}'.format(task_obj.task_result[task_uuid]))
+                                self.delete_uuid(uuid=vm.get('entity_id'), snapshots=True, wait=True, clusteruuid=clusteruuid)
+                                return False
+                    else:
+                        return True
+                else:
+                    logger.warning('vm creation failed. Task details: {0}'.format(task_obj.task_result[task_uuid]))
+                    return False
+            else:
+                return False
+
+    def delete_name(self, name:str, snapshots:bool=False, vg_detach:bool=True, wait:bool=True, clusteruuid:str=None):
+        """Delete an existing virtual machine by name.
+
+        :param name: The name for the VM to be deleted.
+        :type name: str
+        :param snapshots: Whether to also delete VM snapshots when deleting the VM. (Default=False)
+        :type snapshots: bool, optional
+        :param vg_detach: Whether to also detatch any connected volume groups when deleting the VM. (Default=True)
+        :type vg_detach: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the VM was sucessfully created.
+        :rtype: bool
+        .. warning:: As VM names are not necessarily unique, the first result returned will be used.
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.delete_name')
+        uuid = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True).get('uuid')
+
+        if uuid:
+            logger.debug('deleted vm {0} on cluster {1}'.format(name, clusteruuid))
+            return self.delete_uuid(uuid=uuid, snapshots=snapshots, wait=wait, vg_detach=vg_detach, clusteruuid=clusteruuid)
+        else:
+            logger.warning('vm {0} not found on cluster {1}'.format(name, uuid))
+            return False
+
+    def delete_uuid(self, uuid:str, snapshots:bool=False, vg_detach:bool=True, wait:bool=True, clusteruuid:str=None):
+        """Delete an existing virtual machine by virtual machine uuid.
+
+        :param uuid: The uuid for the VM to be deleted.
+        :type uuid: str
+        :param snapshots: Whether to also delete VM snapshots when deleting the VM. (Default=False)
+        :type snapshots: bool, optional
+        :param vg_detach: Whether to also detatch any connected volume groups when deleting the VM. (Default=True)
+        :type vg_detach: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the VM was sucessfully created.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.delete_uuid')
+
+        if vg_detach:
+            vm = self.search_uuid(uuid=uuid, clusteruuid=clusteruuid, refresh=True)
+            if vm:
+                for disk in vm.get('vm_disk_info'):
+                    if disk.get("disk_address").get('volume_group_uuid'):
+                        detach = {
+                            'uuid': disk.get("disk_address").get('volume_group_uuid'),
+                            'index': disk.get("disk_address").get('device_index'),
+                            'vm_uuid': uuid,
+                            'wait': True,
+                            'clusteruuid': clusteruuid,
+                        }
+                        self.detach_vg(**detach)
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}'.format(uuid)
+        method = 'DELETE'
+        payload = None
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        params['delete_snapshots'] = snapshots
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('vm "{0}" deleted successful'.format(uuid))
+                    return True
+                else:
+                    logger.warning('vm "{0}" delete failed. Task details: {1}'.format(uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def add_disks(self, vm_uuid:str, disks:list=None, add_cdrom:bool=False, wait:bool=True, clusteruuid:str=None):
+        """Add disks from a dict to an existing virtual machine.
+
+        :param vm_uuid: The uuid for the VM to be have disks added.
+        :type vm_uuid: str
+        :param disks: A list of vdisks dicts to be added to this VM (default='null').
+
+            The dictionary format per-vDisk is as follows::
+                - bus (str, optional, default='scsi'). The bus to use for the vDisk. Choice of 'scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme'
+                - size_gb (int, optional). Size of vDisk in GB. Use this when creating a new disk or cloning from an image. Can be used to increase the size of vDisk created from an image
+                - storage_container_name (str, optional). Name of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_uuid"
+                - storage_container_uuid (str, optional). UUID of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_name"
+                - image_name (str, optional). Name of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_uuid"
+                - image_uuid (str, optional). UUID of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_name"
+                - volume_group_name (str, optional). Name of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_uuid"
+                - volume_group_uuid (str, optional). UUID of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_name"
+                - flash_mode (bool, optional, default=False). True or False
+                - label (str, optional). Unknown
+
+            Examples;
+                1. Add a single virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, ]
+                2. Add multiple virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, {'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 200, }, ]
+                3. Add a single virtual disk with flash mode enabled - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 15, 'flash_mode': True}, ]
+                4. Add a single virtual disk from an image - [{'bus': 'scsi', 'image_name': 'centos8', }, ]
+                5. Add a single virtual disk from an image with a new minimum size - [{'bus': 'scsi', 'image_name': 'centos8', 'size_gb': 500, }, ]
+                6. Add a volume group - [{'bus': 'scsi', 'volume_group_name': 'volume_group_database1', }, ]
+        :type disks: list, optional
+        :param add_cdrom: Whether to add a cdrom drive to this VM (default=True)
+        :type add_cdrom: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully added.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.add_disk')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}/disks/attach'.format(vm_uuid)
+        method = 'POST'
+        payload = {
+            'uuid': vm_uuid,
+            'vm_disks': [],
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        device_indexes = {
+            'ide': 0,
+            'scsi': 0,
+            'pci': 0,
+            'sata': 0,
+            'spapr': 0,
+            'nvme': 0,
+        }
+
+        vm = self.search_uuid(uuid=vm_uuid, clusteruuid=clusteruuid, refresh=True)
+        if vm:
+            for existing_disk in vm.get('vm_disk_info'):
+                disk_bus = existing_disk.get('disk_address').get('device_bus')
+                disk_index = existing_disk.get('disk_address').get('device_index')
+                if disk_index > device_indexes[disk_bus]:
+                    device_indexes[disk_bus] = disk_index
+        else:
+            raise ValueError()
+
+        if add_cdrom:
+            cdrom_config = {
+                'is_cdrom': True,
+                'is_empty': True,
+                'disk_address': {
+                    'device_bus': 'IDE',
+                    'device_index': device_indexes['ide'],
+                    'is_cdrom': True,
+                }
+            }
+            device_indexes['ide'] += 1
+            payload['vm_disks'].append(cdrom_config)
+
+        for disk in disks:
+            disk['index'] = device_indexes[disk.get('bus', 'scsi')]
+
+            if any([disk.get('storage_container_name'), disk.get('storage_container_uuid')]) and any([disk.get('image_name'), disk.get('image_uuid')]) and \
+                    any([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                raise ValueError()
+
+            elif any([disk.get('storage_container_name'), disk.get('storage_container_uuid')]):
+                if all([disk.get('storage_container_name'), disk.get('storage_container_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('storage_container_name'):
+                    logger.debug('searching for container named "{0}"'.format(disk.get('storage_container_name')))
+                    containers_obj = StorageContainer(api_client=self.api_client)
+                    container = containers_obj.search_name(name=disk.get('storage_container_name'), clusteruuid=clusteruuid)
+                    if container:
+                        logger.debug('found container named "{0}"'.format(disk.get('storage_container_name')))
+                        disk.pop('storage_container_name')
+                        disk['storage_container_uuid'] = container.get('storage_container_uuid')
+                    else:
+                        logger.warning('cannot find container named "{0}"'.format(disk.get('storage_container_name')))
+                        raise ValueError()
+
+                elif disk.get('storage_container_uuid'):
+                    logger.debug('searching for container "{0}"'.format(disk.get('storage_container_uuid')))
+                    containers_obj = StorageContainer(api_client=self.api_client)
+                    container = containers_obj.search_uuid(uuid=disk.get('storage_container_uuid'), clusteruuid=clusteruuid)
+                    if container:
+                        logger.debug('found container "{0}"'.format(disk.get('storage_container_uuid')))
+                        disk.pop('storage_container_name')
+                        disk['storage_container_uuid'] = disk.get('storage_container_uuid')
+                    else:
+                        logger.warning('cannot find container "{0}"'.format(disk.get('storage_container_uuid')))
+                        raise ValueError()
+
+            elif any([disk.get('image_name'), disk.get('image_uuid')]):
+                if all([disk.get('image_name'), disk.get('image_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('image_name'):
+                    logger.debug('searching for image named "{0}"'.format(disk.get('image_name')))
+                    images_obj = Images(api_client=self.api_client)
+                    image = images_obj.search_name(name=disk.get('image_name'), clusteruuid=clusteruuid)
+                    if image:
+                        logger.debug('found image named "{0}"'.format(disk.get('image_name')))
+                        disk.pop('image_name')
+                        disk['image_uuid'] = image.get('vm_disk_id')
+                    else:
+                        logger.warning('cannot find image named "{0}"'.format(disk.get('image_name')))
+                        raise ValueError()
+
+                elif disk.get('image_uuid'):
+                    logger.info('searching for image "{0}"'.format(disk.get('image_uuid')))
+                    images_obj = Images(api_client=self.api_client)
+                    image = images_obj.search_uuid(uuid=disk.get('image_uuid'), clusteruuid=clusteruuid)
+                    if image:
+                        logger.debug('found image "{0}"'.format(disk.get('image_uuid')))
+                        disk.pop('image_uuid')
+                        disk['image_uuid'] = image.get('vm_disk_id')
+                    else:
+                        logger.warning('cannot find image "{0}"'.format(disk.get('image_uuid')))
+                        raise ValueError()
+
+            elif any([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                if all([disk.get('volume_group_name'), disk.get('volume_group_uuid')]):
+                    raise ValueError()
+
+                elif disk.get('volume_group_name'):
+                    logger.info('searching for volume group named "{0}"'.format(disk.get('volume_group_name')))
+                    volume_group_obj = StorageVolume(api_client=self.api_client)
+                    volume_group = volume_group_obj.search_volume_groups_name(name=disk.get('volume_group_name'), clusteruuid=clusteruuid)
+                    if volume_group:
+                        logger.debug('found volume group named "{0}"'.format(disk.get('volume_group_name')))
+                        disk.pop('volume_group_name')
+                        vg = {
+                            'index': disk['index'],
+                            'uuid': volume_group.get('uuid'),
+                        }
+                        self.attach_vg(vm_uuid=vm_uuid, wait=wait, clusteruuid=clusteruuid, **vg)
+                    else:
+                        logger.warning('cannot find volume group named "{0}"'.format(disk.get('volume_group_name')))
+                        raise ValueError()
+
+                elif disk.get('volume_group_uuid'):
+                    logger.info('searching for volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                    volume_group_obj = StorageVolume(api_client=self.api_client)
+                    volume_group = volume_group_obj.search_volume_groups_uuid(uuid=disk.get('volume_group_uuid'), clusteruuid=clusteruuid)
+                    if volume_group:
+                        logger.debug('found volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                        disk.pop('volume_group_uuid')
+                        vg = {
+                            'index': disk['index'],
+                            'uuid': volume_group.get('uuid'),
+                        }
+                        self.attach_vg(vm_uuid=vm_uuid, wait=wait, clusteruuid=clusteruuid, **vg)
+                    else:
+                        logger.warning('cannot find volume group "{0}"'.format(disk.get('volume_group_uuid')))
+                        raise ValueError()
+
+            if any([disk.get('storage_container_name'), disk.get('storage_container_uuid'), disk.get('image_name'), disk.get('image_uuid'), ]):
+                payload['vm_disks'].append(self._vm_disk_spec(**disk))
+            device_indexes[disk.get('bus', 'scsi')] += 1
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk added to vm "{0}" successfully'.format(vm_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be added to vm "{0}". Task details: {1}'.format(vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def remove_disk(self, vm_uuid:str, bus:str=None, index:int=None, wait:bool=True, clusteruuid:str=None):
+        """Remove a disk from a VM
+
+        :param vm_uuid: The uuid for the VM to have a disk removed.
+        :type vm_uuid: str
+        :param bus: The bus where the disk to be removed is located.
+        :type bus: str
+        :param index: The index for the disk to be removed.
+        :type index: int
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully removed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.remove_disk')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}/disks/detach'.format(vm_uuid)
+        method = 'POST'
+        payload = {
+            'uuid': vm_uuid,
+            'vm_disks': [],
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        vm = self.search_uuid(uuid=vm_uuid, clusteruuid=clusteruuid, refresh=True)
+        if vm:
+            for existing_disk in vm.get('vm_disk_info'):
+                if existing_disk.get('disk_address').get('device_bus') == bus and existing_disk.get('disk_address').get('device_index') == index:
+                    payload['vm_disks'].append(existing_disk)
+        else:
+            raise ValueError()
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk removed from vm "{0}" successfully'.format(vm_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be removed from vm "{0}". Task details: {1}'.format(vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def attach_vg(self, index:int, uuid:str, vm_uuid:str, wait:bool=True, clusteruuid:str=None):
+        """Attach a volume group to an existing virtual machine.
+
+        :param index: The index where the volume groups will be attached.
+        :type index: int
+        :param uuid: The uuid of the volume group.
+        :type uuid: str
+        :param vm_uuid: The uuid for the VM to have the volume group attached.
+        :type vm_uuid: str
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully attached.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.attach_vg')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/volume_groups/{0}/attach'.format(uuid)
+        method = 'POST'
+        payload = {
+            'uuid': uuid,
+            'operation': 'ATTACH',
+            'vm_uuid': vm_uuid,
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if index:
+            payload['index'] = index
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.info('vg "{0}" attach to "{1}" successful'.format(uuid, vm_uuid))
+
+                    return True
+                else:
+                    logger.warning('vg "{0}" attach to "{1}" failed. Task details: {2}'.format(uuid, vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def detach_vg(self, index:int, uuid:str, vm_uuid:str, wait:bool=True, clusteruuid:str=None):
+        """Detach a volume group to an existing virtual machine.
+
+        :param index: The index where the volume groups will be attached.
+        :type index: int
+        :param uuid: The uuid of the volume group.
+        :type uuid: str
+        :param vm_uuid: The uuid for the VM to have the volume group attached.
+        :type vm_uuid: str
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully detached.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.attach_vg')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/volume_groups/{0}/detach'.format(uuid)
+        method = 'POST'
+        payload = {
+            'uuid': uuid,
+            'operation': 'DETACH',
+            'vm_uuid': vm_uuid,
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if index:
+            payload['index'] = index
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.info('vg "{0}" detach on "{1}" successful'.format(uuid, vm_uuid))
+
+                    return True
+                else:
+                    logger.warning('vg "{0}" detach on "{1}" failed. Task details: {2}'.format(uuid, vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def add_nics(self, vm_uuid:str, nics:list=None, wait:bool=True, clusteruuid:str=None):
+        """Add one or more nics to an existing virtual machine.
+
+        :param vm_uuid: The uuid for the VM to have the nic attached.
+        :type vm_uuid: str
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the nic(s) were successfully added.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.add_nic')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}/nics'.format(vm_uuid)
+        method = 'POST'
+        payload = {
+            'uuid': vm_uuid,
+            'spec_list': [],
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        vm = self.search_uuid(uuid=vm_uuid, clusteruuid=clusteruuid, refresh=True)
+        if not vm:
+            raise ValueError()
+
+        for nic in nics:
+            if all([nic.get('network_uuid'), nic.get('network_name')]):
+                raise ValueError()
+
+            elif nic.get('network_name'):
+                logger.info('searching for network named "{0}"'.format(nic.get('network_name')))
+                networks_obj = Network(api_client=self.api_client)
+                network = networks_obj.search_name(name=nic.get('network_name'), clusteruuid=clusteruuid)
+                if network:
+                    logger.debug('found network named "{0}"'.format(nic.get('network_name')))
+                    nic.pop('network_name')
+                    nic['network_uuid'] = network.get('uuid')
+                else:
+                    logger.warning('cannot find network named "{0}"'.format(nic.get('network_name')))
+                    raise ValueError()
+
+            elif nic.get('network_uuid'):
+                logger.info('searching for network "{0}"'.format(nic.get('network_uuid')))
+                networks_obj = Network(api_client=self.api_client)
+                network = networks_obj.search_uuid(uuid=nic.get('network_uuid'), clusteruuid=clusteruuid)
+                if network:
+                    logger.debug('found network named "{0}"'.format(nic.get('network_uuid')))
+                    nic.pop('network_uuid')
+                    nic['network_uuid'] = nic.get('network_uuid')
+                else:
+                    logger.warning('cannot find network named "{0}"'.format(nic.get('network_uuid')))
+                    raise ValueError()
+
+            payload['spec_list'].append(self._vm_nic_v2(**nic))
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk added to vm "{0}" successfully'.format(vm_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be added to vm "{0}". Task details: {1}'.format(vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def remove_nic(self, vm_uuid:str, mac_address:str, wait:bool=True, clusteruuid:str=None):
+        """Remove a single nic from an existing virtual machine.
+
+        :param vm_uuid: The uuid for the VM to have the nic attached.
+        :type vm_uuid: str
+        :param mac_address: The mac address for the nic to be removed.
+        :type mac_address: str
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the nic was successfully removed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.add_nic')
+
+        params = {}
+        version = 'v2.0'
+        method = 'DELETE'
+        payload = {
+            'uuid': vm_uuid,
+            'nic_id': [],
+        }
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        vm = self.search_uuid(uuid=vm_uuid, clusteruuid=clusteruuid, refresh=True)
+        if vm:
+            for nic in vm.get('vm_nics'):
+                if nic.get('mac_address') == mac_address:
+                    payload['nic_id'] = mac_address
+                    uri = '/vms/{0}/nics/{1}'.format(vm_uuid, mac_address)
+
+        else:
+            raise ValueError()
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk added to vm "{0}" successfully'.format(vm_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be added to vm "{0}". Task details: {1}'.format(vm_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def power_state(self, uuid:str, desired_state:str='on', wait:bool=True, clusteruuid:str=None):
+        """Change the power state of a specific virtual machine.
+
+        :param uuid: The uuid for the virtual machine to have the nic attached.
+        :type uuid: str
+        :param desired_state: The desired power state for the virtual machine. .
+        :type desired_state: str('on', 'off', 'powercycle', 'reset', 'pause', 'suspend', 'resume', 'save', 'acpi_shutdown', 'acpi_reboot')
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the virtual machines power state was successfully changed.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.power_state')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}/set_power_state'.format(uuid)
+        method = 'POST'
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if desired_state not in ["on", "off", "powercycle", "reset", "pause", "suspend", "resume", "save", "acpi_shutdown", "acpi_reboot"]:
+            raise ValueError()
+
+        payload = {
+            'transition': desired_state.upper()
+        }
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.info('vm power state change to "{0}" successful'.format(desired_state))
+
+                    return True
+                else:
+                    logger.warning('vm power state change to "{0}" failed. Task details: {1}'.format(desired_state, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def update_name(self, name:str, new_name:str=None, vcpus:int=None, memory_gb:int=None, sockets:int=None, vcpu_reservation_hz:int=None,
+                    memory_reservation_gb:int=None, description:str=None, disks:list=[], nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str=None,
+                    add_cdrom:bool=None, ha_priority:int=None, force:bool=False, wait:bool=True, clusteruuid:str=None):
+        """Updates a specific virtual machine by the vm name provided.
+
+        :param name: The name for the virtual machine to be updated.
+        :type name: str
+        :param new_name: A new name for the virtual machine.
+        :type new_name: str, optional
+        :param vcpus: The number of vCPUs to be assigned to this VM
+        :type vcpus: int
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
+        :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
+        :type sockets: int, optional
+        :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type vcpu_reservation_hz: int, optional
+        :param memory_reservation_gb: An amount of memory to lock to this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type memory_reservation_gb: int, optional
+        :param description: A description for the VM (default='')
+        :type description: str, optional
+        :param add_cdrom: Whether to add a cdrom drive to this VM (default=True)
+        :type add_cdrom: bool, optional
+        :param disks: A list of vdisks dicts to be added to this VM (default='null').
+
+            The dictionary format per-vDisk is as follows::
+                - bus (str, optional, default='scsi'). The bus to use for the vDisk. Choice of 'scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme'
+                - size_gb (int, optional). Size of vDisk in GB. Use this when creating a new disk or cloning from an image. Can be used to increase the size of vDisk created from an image
+                - storage_container_name (str, optional). Name of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_uuid"
+                - storage_container_uuid (str, optional). UUID of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_name"
+                - image_name (str, optional). Name of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_uuid"
+                - image_uuid (str, optional). UUID of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_name"
+                - volume_group_name (str, optional). Name of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_uuid"
+                - volume_group_uuid (str, optional). UUID of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_name"
+                - flash_mode (bool, optional, default=False). True or False
+                - label (str, optional). Unknown
+
+            Examples;
+                1. Add a single virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, ]
+                2. Add multiple virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, {'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 200, }, ]
+                3. Add a single virtual disk with flash mode enabled - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 15, 'flash_mode': True}, ]
+                4. Add a single virtual disk from an image - [{'bus': 'scsi', 'image_name': 'centos8', }, ]
+                5. Add a single virtual disk from an image with a new minimum size - [{'bus': 'scsi', 'image_name': 'centos8', 'size_gb': 500, }, ]
+                6. Add a volume group - [{'bus': 'scsi', 'volume_group_name': 'volume_group_database1', }, ]
+        :type disks: list, optional
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param gpus: A list of GPU dicts to be added to the VM (default='null')
+
+            The dictionary format per-GPU is as follows::
+                - device_id (int).
+                - gpu_type (str, optional, default='null'). The type of GPU to add. Choice of 'pass_through_graphics'
+                - gpu_vendor (str, optional, default='null'). The GPU vendor to add. Choice of 'nvidia',
+        :type gpus: list, optional
+        :param serial_ports: A list of serial port dicts to be added to the VM (default='null')
+
+            The dictionary format per-serial port is as follows::
+                - port_index (int).
+                - port_type (str, optional, default='null'). The type of serial port to add. Choice of 'null', 'server'
+        :type serial_ports: list, optional
+        :param timezone: The timezone for the virtual machine (default='UTC').
+        :type timezone: str, optional
+        :param ha_priority: VM HA priority. Only applicable to ESXi hypervisor (default=0)
+        :type ha_priority: int, optional
+        :param force: If the VM is not in a power state that will allow the change to be made, force will change the VM power state to apply the update, then
+                        return the VM to its original power state once the update has been completed. (defaults=False)
+        :type force: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the virtual machine was successfully updated.
+        :rtype: bool
+        .. warning:: As VM names are not necessarily unique, the first result returned will be used.
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.update')
+        config = None
+
+        if not name:
+            raise ValueError()
+
+        elif name:
+            vm = self.search_name(name=name, refresh=True, clusteruuid=clusteruuid)
+            if vm.get('uuid'):
+                vm_config = {
+                    'uuid': vm.get('uuid'),
+                    'new_name': new_name,
+                    'vcpus': vcpus,
+                    'memory_gb': memory_gb,
+                    'sockets': sockets,
+                    'vcpu_reservation_hz': vcpu_reservation_hz,
+                    'memory_reservation_gb': memory_reservation_gb,
+                    'description': description,
+                    'disks': disks,
+                    'nics': nics,
+                    'gpus': gpus,
+                    'serial_ports': serial_ports,
+                    'timezone': timezone,
+                    'add_cdrom': add_cdrom,
+                    'ha_priority': ha_priority,
+                    'force': force,
+                }
+
+                result = self.update_uuid(wait=wait, clusteruuid=clusteruuid, **vm_config)
+                return result
+            else:
+                raise ValueError()
+
+    def update_uuid(self, uuid:str, new_name:str=None, vcpus:int=None, memory_gb:int=None, sockets:int=None, vcpu_reservation_hz:int=None,
+                    memory_reservation_gb:int=None, description:str=None, disks:list=[], nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str=None,
+                    add_cdrom:bool=None, ha_priority:int=None, force:bool=False, wait:bool=True, clusteruuid:str=None):
+        """Updates a specific virtual machine by the uuid provided
+
+        :param uuid: The uuid for the virtual machine to be updated.
+        :type uuid: str
+        :param new_name: A new name for the virtual machine.
+        :type new_name: str, optional
+        :param vcpus: The number of vCPUs to be assigned to this VM
+        :type vcpus: int
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
+        :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
+        :type sockets: int, optional
+        :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type vcpu_reservation_hz: int, optional
+        :param memory_reservation_gb: An amount of memory to lock to this VM. Only applicable on the ESXi hypervisor. (default=0)
+        :type memory_reservation_gb: int, optional
+        :param description: A description for the VM (default='')
+        :type description: str, optional
+        :param add_cdrom: Whether to add a cdrom drive to this VM (default=True)
+        :type add_cdrom: bool, optional
+        :param disks: A list of vdisks dicts to be added to this VM (default='null').
+
+            The dictionary format per-vDisk is as follows::
+                - bus (str, optional, default='scsi'). The bus to use for the vDisk. Choice of 'scsi', 'ide', 'pci', 'sata', 'spapr', 'nvme'
+                - size_gb (int, optional). Size of vDisk in GB. Use this when creating a new disk or cloning from an image. Can be used to increase the size of vDisk created from an image
+                - storage_container_name (str, optional). Name of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_uuid"
+                - storage_container_uuid (str, optional). UUID of Storage Container. Only used when creating a new vDisk. Mutually exclusive with "storage_container_name"
+                - image_name (str, optional). Name of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_uuid"
+                - image_uuid (str, optional). UUID of Image to clone from. Only used when creating a new vDisk from an existing image. Mutually exclusive with "image_name"
+                - volume_group_name (str, optional). Name of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_uuid"
+                - volume_group_uuid (str, optional). UUID of Volume Group to attach. Only used when attaching an existing volume group. Mutually exclusive with "volume_group_name"
+                - flash_mode (bool, optional, default=False). True or False
+                - label (str, optional). Unknown
+
+            Examples;
+                1. Add a single virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, ]
+                2. Add multiple virtual disk - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 50, }, {'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 200, }, ]
+                3. Add a single virtual disk with flash mode enabled - [{'bus': 'scsi', 'storage_container_name': 'default', 'size_gb': 15, 'flash_mode': True}, ]
+                4. Add a single virtual disk from an image - [{'bus': 'scsi', 'image_name': 'centos8', }, ]
+                5. Add a single virtual disk from an image with a new minimum size - [{'bus': 'scsi', 'image_name': 'centos8', 'size_gb': 500, }, ]
+                6. Add a volume group - [{'bus': 'scsi', 'volume_group_name': 'volume_group_database1', }, ]
+        :type disks: list, optional
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param gpus: A list of GPU dicts to be added to the VM (default='null')
+
+            The dictionary format per-GPU is as follows::
+                - device_id (int).
+                - gpu_type (str, optional, default='null'). The type of GPU to add. Choice of 'pass_through_graphics'
+                - gpu_vendor (str, optional, default='null'). The GPU vendor to add. Choice of 'nvidia',
+        :type gpus: list, optional
+        :param serial_ports: A list of serial port dicts to be added to the VM (default='null')
+
+            The dictionary format per-serial port is as follows::
+                - port_index (int).
+                - port_type (str, optional, default='null'). The type of serial port to add. Choice of 'null', 'server'
+        :type serial_ports: list, optional
+        :param timezone: The timezone for the virtual machine (default='UTC').
+        :type timezone: str, optional
+        :param ha_priority: VM HA priority. Only applicable to ESXi hypervisor (default=0)
+        :type ha_priority: int, optional
+        :param force: If the VM is not in a power state that will allow the change to be made, force will change the VM power state to apply the update, then
+                        return the VM to its original power state once the update has been completed. (defaults=False)
+        :type force: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the virtual machine was successfully updated.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.update')
+
+        if not uuid:
+            raise ValueError()
+
+        elif uuid:
+            vm = self.search_uuid(uuid=uuid, refresh=True, clusteruuid=clusteruuid)
+            if not vm.get('uuid'):
+                raise ValueError()
+
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}'.format(uuid)
+        method = 'PUT'
+        payload = {
+            'uuid': uuid,
+        }
+
+        current_power_state = vm.get('power_state').lower()
+        required_power_state = None
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        if new_name:
+            payload['name'] = new_name
+
+        if description:
+            payload['description'] = description
+
+        if memory_gb:
+            required_power_state = 'off'
+            bm_memory_gb = bitmath.GB(memory_gb)
+            bm_memory_mb = bm_memory_gb.to_MB()
+            payload['memory_mb'] = int(bm_memory_mb)
+
+        if sockets:
+            required_power_state = 'off'
+            payload['sockets'] = sockets
+
+        if vcpus:
+            required_power_state = 'off'
+            payload['num_vcpus'] = vcpus
+
+        if timezone:
+            payload['timezone'] = timezone
+
+        if ha_priority:
+            payload['ha_priority'] = ha_priority
+
+        if vcpu_reservation_hz:
+            payload['vcpu_reservation_hz'] = int(vcpu_reservation_hz)
+
+        if memory_reservation_gb:
+            bm_memory_reservation_gb = bitmath.GB(memory_reservation_gb)
+            bm_memory_reservation_mb = bm_memory_reservation_gb.to_MB()
+            payload['memory_reservation_mb'] = int(bm_memory_reservation_mb)
+
+        if disks:
+            self.add_disks(vm_uuid=uuid, disks=disks, add_cdrom=add_cdrom, wait=wait, clusteruuid=clusteruuid)
+
+        if nics:
+            self.add_nics(vm_uuid=uuid, nics=nics, wait=wait, clusteruuid=clusteruuid)
+
+        if gpus:
+            required_power_state = 'off'
+            pass
+
+        if serial_ports:
+            required_power_state = 'off'
+            pass
+
+        if current_power_state != required_power_state and force:
+            self.power_state(uuid=uuid, desired_state=required_power_state, wait=True, clusteruuid=clusteruuid)
+        elif current_power_state != required_power_state and not force:
+            raise ValueError()
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait or (current_power_state != required_power_state and force):
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('vm "{0}" updated successfully'.format(uuid))
+                    return True
+                else:
+                    logger.warning('vm "{0}" failed to update. Task details: {1}'.format(uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+        if current_power_state != required_power_state and force:
+            self.power_state(uuid=uuid, desired_state=current_power_state, wait=True, clusteruuid=clusteruuid)
+        elif current_power_state != required_power_state and not force:
+            raise ValueError()
+
+    def clone_name(self, source_name:str, name:str, vcpus:int=None, memory_gb:int=None, sockets:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
+                   wait:bool=True, clusteruuid:str=None):
+        """Clones an existing virtual machine based on the provided virtual machine name.
+
+        :param source_name: The name for the virtual machine to be cloned.
+        :type source_name: str
+        :param name: The name for the new virtual machine.
+        :type name: str
+        :param vcpus: The number of vCPUs to be assigned to this VM
+        :type vcpus: int
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
+        :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
+        :type sockets: int, optional
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param sysprep: The sysprep XML string to use to customize this VM upon first power on. Only applicable for AHV and a Windows OS. (default='null')
+        :type sysprep: str, optional
+        :param cloudinit: The cloudinit text string to use to customize this VM upon first power on. Only applicable for AHV and a Linux OS. (default='null')
+        :type cloudinit: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the VM was successfully cloned.
+        :rtype: bool
+        .. warning:: As VM names are not necessarily unique, the first result returned will be used.
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.clone_name')
+        uuid = self.search_name(name=source_name, clusteruuid=clusteruuid, refresh=True).get('uuid')
+        if uuid:
+            logger.debug('cloning vm {0} on cluster {1}'.format(name, clusteruuid))
+            return self.clone_uuid(source_uuid=uuid, name=name, vcpus=vcpus, memory_gb=memory_gb, sockets=sockets, nics=nics,
+                                   sysprep=sysprep, cloudinit=cloudinit, wait=wait, clusteruuid=clusteruuid)
+        else:
+            logger.warning('vm {0} not found on cluster {1}'.format(name, uuid))
+            return False
+
+    def clone_uuid(self, source_uuid:str, name:str, vcpus:int=None, memory_gb:int=None, sockets:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
+                   wait:bool=True, clusteruuid:str=None):
+        """Clones an existing virtual machine based on the provided virtual machine uuid.
+
+        :param source_uuid: The uuid for the virtual machine to be cloned.
+        :type source_uuid: str
+        :param name: The name for the new virtual machine.
+        :type name: str
+        :param vcpus: The number of vCPUs to be assigned to this VM
+        :type vcpus: int
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
+        :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
+        :type sockets: int, optional
+        :param nics: A list of NIC dicts to be added to this VM (default='null').
+
+            The dictionary format per-NIC is as follows::
+                - network_name (str, optional). The name of the network or port group to attach the NIC onto. Mutually exclusive with "network_uuid".
+                - network_uuid (str, optional). The uuid of the network or port group to attach the NIC onto. Mutually exclusive with "network_name".
+                - adaptor_type (str, optional, default='e1000'). The network adaptor type to use for the NIC. Choice of 'e1000', 'e1000e', 'pcnet32', 'vmxnet', 'vmxnet2', 'vmxnet3',
+                - connect (bool, optional, default=True). Whether to connect the NIC to the network.
+                - mac_address (str, optional, default=None). A user-defined MAC address to use for this NIC.
+                - ipam (bool, optional, default=False). Whether to use AHV IPAM to automatically provide an IP address.
+                - requested_ip_address (str, optional). A user-defined IP address to use in conjunction with AHV IPAM. Requires 'ipam' to also be set to True.
+
+            Examples;
+                1. Create a simple NIC - [{'network_name': 'vm network',}, ]
+                2. Create a NIC with AHV IPAM - [{'network_name': 'vm network', 'ipam': True, }, ]
+                3. Create multiple NICs with mixed configuration - [{'network_name': 'vm network 1', }, {'network_name': 'vm network 2', 'ipam': True, }, ]
+                4. Create a NIC with AHV IPAM and a defined IP address - [{'network_name': 'vm network', 'ipam': True, 'requested_ip_address': '172.16.100.51', }, ]
+        :type nics: list, optional
+        :param sysprep: The sysprep XML string to use to customize this VM upon first power on. Only applicable for AHV and a Windows OS. (default='null')
+        :type sysprep: str, optional
+        :param cloudinit: The cloudinit text string to use to customize this VM upon first power on. Only applicable for AHV and a Linux OS. (default='null')
+        :type cloudinit: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the VM was successfully cloned.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.Vms.clone_uuid')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/vms/{0}/clone'.format(source_uuid)
+        method = 'POST'
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        vm = self.search_uuid(uuid=source_uuid, clusteruuid=clusteruuid, refresh=True)
+        if vm:
+            logger.info('vm found "{0}"'.format(vm))
+        else:
+            raise ValueError()
+
+        spec = {
+            'name': name,
+            'num_vcpus': vm.get('num_vcpus'),
+            'num_cores_per_vcpu': vm.get('num_cores_per_vcpu'),
+            'memory_mb': vm.get('memory_mb'),
+            'override_network_config': False,
+        }
+
+        payload = {
+            'uuid': source_uuid,
+            'spec_list': [],
+        }
+
+        if sockets:
+            spec['num_vcpus'] = sockets
+
+        if vcpus:
+            spec['num_cores_per_vcpu'] = (vcpus/spec['num_vcpus'])
+
+        if memory_gb:
+            bm_memory_gb = bitmath.GB(memory_gb)
+            bm_memory_mb = bm_memory_gb.to_MB()
+            spec['memory_mb'] = int(bm_memory_mb)
+
+        if nics:
+            spec['override_network_config'] = True
+            for nic in nics:
+                pass
+
+        payload['spec_list'].append(spec)
+
+        if all([sysprep, cloudinit]):
+            raise ValueError('Please provide either sysprep or cloudinit NOT both.')
+
+        elif sysprep:
+            payload['vm_customization_config'] = {
+                'fresh_install': False,
+                'userdata': sysprep,
+            }
+
+        elif cloudinit:
+            payload['vm_customization_config'] = {
+                'fresh_install': False,
+                'userdata': cloudinit,
+            }
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('vm "{0}" cloned successful'.format(source_uuid))
+                    return True
+                else:
+                    logger.warning('vm "{0}" clone failed. Task details: {1}'.format(source_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
 
 class Images(object):
     """A class to represent a Nutanix Clusters Images
@@ -3782,6 +5469,848 @@ class StorageVolume(object):
         self.volumes[clusteruuid] = result
         return self.volumes[clusteruuid]
 
+    def _disk_config(self, size_gb:int=0, index:int=0, storage_container_name:str=None, storage_container_uuid:str=None, clusteruuid:str=None):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume._disk_config')
+
+        if size_gb:
+            bm_size_gb = bitmath.GiB(size_gb)
+            bm_size = bm_size_gb.to_Byte()
+        else:
+            raise ValueError()
+
+        if all([storage_container_name, storage_container_uuid]):
+            raise ValueError()
+
+        elif storage_container_name:
+            logger.debug('searching for container named "{0}"'.format(storage_container_name))
+            containers_obj = StorageContainer(api_client=self.api_client)
+            container = containers_obj.search_name(name=storage_container_name, clusteruuid=clusteruuid)
+            if container:
+                logger.debug('found container named "{0}"'.format(storage_container_name))
+                storage_container_uuid = container.get('storage_container_uuid')
+            else:
+                logger.warning('cannot find container named "{0}"'.format(storage_container_name))
+                raise ValueError()
+
+        elif storage_container_uuid:
+            logger.debug('searching for container "{0}"'.format(storage_container_uuid))
+            containers_obj = StorageContainer(api_client=self.api_client)
+            container = containers_obj.search_uuid(uuid=storage_container_uuid, clusteruuid=clusteruuid)
+            if container:
+                logger.debug('found container "{0}"'.format(storage_container_uuid))
+            else:
+                logger.warning('cannot find container "{0}"'.format(storage_container_uuid))
+                raise ValueError()
+
+        disk = {
+            # 'container_uuid': storage_container_uuid,
+            'index': index,
+            'create_config': {
+                'storage_container_uuid': storage_container_uuid,
+                'size': int(bm_size)
+            },
+            'create_spec': {
+                'container_uuid': storage_container_uuid,
+                'size': int(bm_size)
+            },
+        }
+
+        return disk
+
+    def create_volume_group(self, name:str, description:str='', flash_mode:bool=False, load_balancing:bool=True, disks:list=[], vms:list=[],
+                            iscsi_initators:list=[], iscsi_target:str=None, iscsi_chap_password:str=None, wait:bool=True, clusteruuid=None):
+        """Create a new volume group.
+
+        :param name: A name for the new volume group.
+        :type name: str
+        :param description: A description for this volume group.
+        :type description: str, optional
+        :param flash_mode: Whether to enable flash mode on this volume group. (defaults=False)
+        :type flash_mode: bool, optional
+        :param load_balancing: Whether to enable volume group load balancing on this volume group. (defaults=True)
+        :type load_balancing: bool, optional
+        :param disks: A list of dicts describing the disks to be added to this volume group.
+
+            The dictionary format per-disk is as follows::
+                - size_gb (str). The size of the disk in GB.
+                - storage_container_name (str). The name of the storage container on which to place the disk. Mutually exclusive with "storage_container_uuid".
+                - storage_container_uuid (str). The uuid of the storage container on which to place the disk. Mutually exclusive with "storage_container_name".
+                - index (int, optional). The index of the drive within the volume group.
+
+            Examples;
+                1. A single disk - [{'size_gb': 50, 'storage_container_name': 'default',}, ]
+                2. Multiple disks - [{'size_gb': 50, 'storage_container_name': 'default',}, {'size_gb': 25, 'storage_container_name': 'default',}, ]
+                3. Multiple disks with specific indexes - [{'size_gb': 50, 'storage_container_name': 'default', 'index': 1}, {'size_gb': 25, 'storage_container_name': 'default', , 'index': 0}, ]
+        :type disks: list, optional
+        :param vms: A list of dicts describing the VMs to be attached to this volume group.
+
+            The dictionary format per-vm is as follows::
+                - vm_uuid (str). The uuid of the virtual machine.
+                - index (str). The scsi index to attach the volume group with one the VM.
+
+            Examples;
+                1. Attach a single VM - [{'vm_uuid': '95764410-db35-48f8-8cf9-217a8fabb547', 'index': 10, }, ]
+                2. Attach a multiple VMs - [{'vm_uuid': '95764410-db35-48f8-8cf9-217a8fabb547', 'index': 10, }, {'vm_uuid': 'e3c543e9-c68c-468b-abd1-61a6d039a84d', 'index': 10, }, ]
+        :type vms: list, optional
+        :param iscsi_initators: A list of the iscsi initiators to be present on this volume group.
+        :type iscsi_initators: list, optional
+        :param iscsi_target: The iscsi target for this volume group.
+        :type iscsi_target: str, optional
+        :param iscsi_chap_password: The iscsi CHAP password if wanted for this volume group.
+        :type iscsi_chap_password: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully created.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.create_volume_group')
+
+        params = {}
+        version = 'v2.0'
+        uri = '/volume_groups'
+        method = 'POST'
+        payload = {
+            'name': name,
+            'enabled_authentications': [],
+            'description': description,
+            'flash_mode_enabled': flash_mode,
+            'load_balance_vm_attachments': load_balancing,
+            'disk_list': []
+        }
+
+        if iscsi_initators:
+            payload['iscsi_initiator_list'] = iscsi_initators
+
+        if iscsi_target:
+            payload['iscsi_target'] = iscsi_target
+
+        if iscsi_chap_password:
+            auth = {
+                'auth_type': 'CHAP',
+                'password': iscsi_chap_password,
+            }
+            payload['enabled_authentications'].append(auth)
+        else:
+            auth = {
+                'auth_type': 'NONE'
+            }
+            payload['enabled_authentications'].append(auth)
+
+        disk_indexes = []
+        for disk in disks:
+            disk_index = 0
+            if not disk.get('size_gb'):
+                raise ValueError()
+
+            if not disk.get('index'):
+                if disk_indexes:
+                    while disk_index in disk_indexes:
+                        disk_index += 1
+            else:
+                if disk.get('index') in disk_indexes:
+                    raise ValueError()
+                disk_index = disk.get('index')
+            disk_indexes.append(disk_index)
+
+            disk_config = {
+                'size_gb': disk.get('size_gb', 0),
+                'index': disk_index,
+                'storage_container_uuid': disk.get('storage_container_uuid', None),
+                'storage_container_name': disk.get('storage_container_name', None),
+            }
+            payload['disk_list'].append(self._disk_config(clusteruuid=clusteruuid, **disk_config))
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        logger.info('payload "{0}"'.format(payload))
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('volume group "{0}" created successfully'.format(name))
+
+                    for vg in task_obj.task_result[task.get('task_uuid')].get('entity_list'):
+
+                        for vm in vms:
+                            attach_config = {
+                                'vm_uuid': vm.get('uuid', None),
+                                'index': vm.get('index', None),
+                                'wait': wait,
+                                'clusteruuid': clusteruuid,
+                                'vg_uuid': vg.get('entity_id')
+                            }
+                            self.attach_volume_group(**attach_config)
+
+                    return True
+                else:
+                    logger.warning('volume group failed to be created "{0}". Task details: {1}'.format(name, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def update_volume_group_name(self, name:str, description:str=None, flash_mode:bool=None, load_balancing:bool=None, iscsi_initiators:list=None,
+                                 iscsi_target:str=None, wait:bool=True, clusteruuid=None):
+        """Update the configuration of a volume group specified by name.
+
+        :param name: The name for the volume group to be updated.
+        :type name: str
+        :param description: A description for this volume group.
+        :type description: str, optional
+        :param flash_mode: Whether to enable flash mode on this volume group. (defaults=False)
+        :type flash_mode: bool, optional
+        :param load_balancing: Whether to enable volume group load balancing on this volume group. (defaults=True)
+        :type load_balancing: bool, optional
+        :param iscsi_initiators: A list of the iscsi initiators to be present on this volume group.
+        :type iscsi_initatiors: list, optional
+        :param iscsi_target: The iscsi target for this volume group.
+        :type iscsi_target: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully updated.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.update_volume_group_name')
+        vg = self.search_volume_groups_name(name=name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('volume group "{0}" found'.format(name))
+            return self.update_volume_group_uuid(uuid=vg.get('uuid'), name=name, description=description, flash_mode=flash_mode, load_balancing=load_balancing,
+                                                 iscsi_initiators=iscsi_initiators, iscsi_target=iscsi_target, wait=wait, clusteruuid=clusteruuid)
+        else:
+            raise ValueError()
+
+    def update_volume_group_uuid(self, uuid:str, name:str=None, description:str=None, flash_mode:bool=None, load_balancing:bool=None, iscsi_initiators:list=None,
+                                 iscsi_target:str=None, wait:bool=True, clusteruuid=None):
+        """Update the configuration of a volume group specified by uuid.
+
+        :param uuid: The uuid for the volume group to be updated.
+        :type uuid: str
+        :param name: A new name for the volume group to be updated.
+        :type name: str, optional
+        :param description: A description for this volume group.
+        :type description: str, optional
+        :param flash_mode: Whether to enable flash mode on this volume group. (defaults=False)
+        :type flash_mode: bool, optional
+        :param load_balancing: Whether to enable volume group load balancing on this volume group. (defaults=True)
+        :type load_balancing: bool, optional
+        :param iscsi_initiators: A list of the iscsi initiators to be present on this volume group.
+        :type iscsi_initiators: list, optional
+        :param iscsi_target: The iscsi target for this volume group.
+        :type iscsi_target: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully updated.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.update_volume_group_uuid')
+        params = {}
+        uri = '/volume_groups/{0}'.format(uuid)
+        method = 'PUT'
+        payload = {
+            'uuid': uuid
+        }
+
+        if name:
+            payload['name'] = name
+
+        if description:
+            payload['description'] = description
+
+        if type(flash_mode) == bool:
+            payload['flash_mode_enabled'] = flash_mode
+
+        if type(load_balancing) == bool:
+            payload['load_balance_vm_attachments'] = load_balancing
+
+        if iscsi_initiators:
+            payload['iscsi_initiator_name_list'] = iscsi_initiators
+
+        if iscsi_target:
+            payload['iscsi_target'] = iscsi_target
+
+        task = self.api_client.request(uri=uri, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('volume group "{0}" updated successfully'.format(uuid))
+                    return True
+                else:
+                    logger.warning('volume group failed to be updated "{0}". Task details: {1}'.format(uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def delete_volume_group_name(self, name:str, wait:bool=True, clusteruuid=None):
+        """Delete a volume group specified by name.
+
+        :param name: The name for the volume group to be deleted.
+        :type name: str
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully deleted.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.delete_volume_group_name')
+        vg = self.search_volume_groups_name(name=name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('volume group "{0}" found'.format(name))
+            return self.delete_volume_group_uuid(uuid=vg.get('uuid'), wait=wait, clusteruuid=clusteruuid)
+        else:
+            raise ValueError()
+
+    def delete_volume_group_uuid(self, uuid:str, wait:bool=True, clusteruuid=None):
+        """Delete a volume group specified by uuid.
+
+        :param uuid: The uuid for the volume group to be deleted.
+        :type uuid: str
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully deleted.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.delete_volume_group_uuid')
+        params = {}
+        payload = {}
+        uri = '/volume_groups/{0}'.format(uuid)
+        method = 'DELETE'
+        response_code = 201
+
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        vg = self.search_volume_groups_uuid(uuid=uuid, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('volume group "{0}" found'.format(uuid))
+        else:
+            raise ValueError()
+
+        task = self.api_client.request(uri=uri, payload=payload, params=params, method=method, response_code=response_code)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('volume group "{0}" deleted successfully'.format(uuid))
+                    return True
+                else:
+                    logger.warning('volume group failed to be deleted "{0}". Task details: {1}'.format(uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def attach_volume_group(self, vm_uuid:str, vg_uuid:str, index:int=None, wait:bool=True, clusteruuid:str=None):
+        """Attach a VM to a volume group.
+
+        :param vg_uuid: The uuid for the volume group.
+        :type vg_uuid: str
+        :param vm_uuid: The uuid for the vm to be attached to the volume group.
+        :type vm_uuid: str
+        :param index: The SCSI index to attached the volume group onto on the VM.
+        :type index: int, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully attached.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.attach_volume_group')
+        spec = {
+            'vm_uuid': vm_uuid,
+            'uuid': vg_uuid,
+        }
+        if index:
+            spec['index'] = index
+
+        vms_obj = Vms(api_client=self.api_client)
+        vms_obj.attach_vg(wait=wait, clusteruuid=clusteruuid, **spec)
+
+    def detach_volume_group(self, vm_uuid:str, vg_uuid:str, index:int, wait:bool=True, clusteruuid:str=None):
+        """Detach a VM to a volume group.
+
+        :param vg_uuid: The uuid for the volume group.
+        :type vg_uuid: str
+        :param vm_uuid: The uuid for the vm to be detached to the volume group.
+        :type vm_uuid: str
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully detached.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.detach_volume_group')
+        spec = {
+            'vm_uuid': vm_uuid,
+            'uuid': vg_uuid,
+            'index': index,
+        }
+
+        vms_obj = Vms(api_client=self.api_client)
+        vms_obj.detach_vg(wait=wait, clusteruuid=clusteruuid, **spec)
+
+    def clone_volume_group_name(self, source_name:str, dest_name:str, load_balancing:bool=True, iscsi_chap_password:str=None, iscsi_initiators:list=[],
+                                iscsi_target:str=None, wait:bool=True, clusteruuid=None):
+        """ Clone a volume group by name.
+
+        :param source_name: The name for the volume group that is to be cloned.
+        :type source_name: str
+        :param dest_name: The name for the new volume group.
+        :type dest_name: str
+        :param load_balancing: Whether to enable volume group load balancing on this volume group. (defaults=True)
+        :type load_balancing: bool, optional
+        :param iscsi_chap_password: The iscsi CHAP password if wanted for this volume group.
+        :type iscsi_chap_password: str, optional
+        :param iscsi_initiators: A list of the iscsi initiators to be present on this volume group.
+        :type iscsi_initiators: list, optional
+        :param iscsi_target: The iscsi target for this volume group.
+        :type iscsi_target: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully cloned.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.clone_volume_group_name')
+        vg = self.search_volume_groups_name(name=source_name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('volume group "{0}" found'.format(source_name))
+            return self.clone_volume_group_uuid(source_uuid=vg.get('uuid'), dest_name=dest_name, load_balancing=load_balancing, iscsi_target=iscsi_target,
+                                                iscsi_initiators=iscsi_initiators, iscsi_chap_password=iscsi_chap_password, wait=wait, clusteruuid=clusteruuid)
+        else:
+            raise ValueError()
+
+    def clone_volume_group_uuid(self, source_uuid:str, dest_name:str, load_balancing:bool=True, iscsi_chap_password:str=None, iscsi_initiators:list=[],
+                                iscsi_target:str=None, wait:bool=True, clusteruuid=None):
+        """ Clone a volume group by name.
+
+        :param source_uuid: The uuid for the volume group that is to be cloned.
+        :type source_uuid: str
+        :param dest_name: The name for the new volume group.
+        :type dest_name: str
+        :param load_balancing: Whether to enable volume group load balancing on this volume group. (defaults=True)
+        :type load_balancing: bool, optional
+        :param iscsi_chap_password: The iscsi CHAP password if wanted for this volume group.
+        :type iscsi_chap_password: str, optional
+        :param iscsi_initiators: A list of the iscsi initiators to be present on this volume group.
+        :type iscsi_initiators: list, optional
+        :param iscsi_target: The iscsi target for this volume group.
+        :type iscsi_target: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the volume group was successfully cloned.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.clone_volume_group_uuid')
+        params = {}
+        uri = '/volume_groups/{0}/clone'.format(source_uuid)
+        method = 'POST'
+        version = 'v2.0'
+        payload = {
+            'name': dest_name,
+            'enabled_authentications': [],
+            'load_balance_vm_attachments': load_balancing,
+        }
+
+        if iscsi_initiators:
+            payload['iscsi_initiator_list'] = iscsi_initiators
+
+        if iscsi_target:
+            payload['iscsi_target'] = iscsi_target
+
+        if iscsi_chap_password:
+            auth = {
+                'auth_type': 'CHAP',
+                'password': iscsi_chap_password,
+            }
+            payload['enabled_authentications'].append(auth)
+        else:
+            auth = {
+                'auth_type': 'NONE'
+            }
+            payload['enabled_authentications'].append(auth)
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('volume group "{0}" cloned to {1} successfully'.format(source_uuid, dest_name))
+                    return True
+                else:
+                    logger.warning('volume group "{0}" failed to clone. Task details: {1}'.format(source_uuid, task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def add_disk_by_volume_group_name(self, volume_group_name:str, size_gb:int, index:int=0, storage_container_uuid:str=None, storage_container_name:str=None,
+                                      wait:bool=True, clusteruuid=None):
+        """Add a new disk to an existing volume group using the volume group name.
+
+        :param volume_group_name: The name of the volume group to which the new disk is to be added.
+        :type volume_group_name: str
+        :param size_gb: The size of the volume group disk to add in GB.
+        :type size_gb: int
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param storage_container_uuid: The uuid of the container that this volume group disk will be created on. Either this parameter or
+                                       'storage_container_name' must be provided.
+        :type storage_container_uuid: str, optional
+        :param storage_container_name: The name of the container that this volume group disk will be created on. Either this parameter or
+                                       'storage_container_uuid' must be provided.
+        :type storage_container_name: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully added to the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.add_disk_by_volume_group_name')
+
+        logger.debug('searching for volume group named "{0}"'.format(volume_group_name))
+        vg = self.search_volume_groups_name(name=volume_group_name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group named "{0}"'.format(volume_group_name))
+            volume_group_uuid = vg.get('uuid')
+        else:
+            logger.warning('cannot find volume group named "{0}"'.format(volume_group_name))
+            raise ValueError()
+
+        volume_config = {
+            'volume_group_uuid': volume_group_uuid,
+            'size_gb': size_gb,
+            'index': index,
+            'storage_container_uuid': storage_container_uuid,
+            'storage_container_name': storage_container_name,
+        }
+        return self.add_disk_by_volume_group_uuid(wait=wait, clusteruuid=clusteruuid, **volume_config)
+
+    def add_disk_by_volume_group_uuid(self, volume_group_uuid:str, size_gb:int, index:int=0, storage_container_uuid:str=None, storage_container_name:str=None,
+                                      wait:bool=True, clusteruuid=None):
+        """Add a new disk to an existing volume group using the volume group uuid.
+
+        :param volume_group_uuid: The uuid of the volume group to which the new disk is to be added.
+        :type volume_group_uuid: str
+        :param size_gb: The size of the volume group disk to add in GB.
+        :type size_gb: int
+        :param storage_container_uuid: The uuid of the container that this volume group disk will be created on. Either this parameter or
+                                       'storage_container_name' must be provided.
+        :type storage_container_uuid: str, optional
+        :param storage_container_name: The name of the container that this volume group disk will be created on. Either this parameter or
+                                       'storage_container_uuid' must be provided.
+        :type storage_container_name: str, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully added to the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.add_disk_by_volume_group_uuid')
+
+        logger.debug('searching for volume group "{0}"'.format(volume_group_uuid))
+        vg = self.search_volume_groups_uuid(uuid=volume_group_uuid, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group "{0}"'.format(volume_group_uuid))
+        else:
+            logger.warning('cannot find volume group "{0}"'.format(volume_group_uuid))
+            raise ValueError()
+
+        if index:
+            if any(item['index'] for item in vg.get('disk_list') if item['index'] == index):
+                raise ValueError
+        else:
+            index = max(item['index'] for item in vg.get('disk_list'))+1
+
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        version = 'v2.0'
+        uri = '/volume_groups/{0}/disks'.format(volume_group_uuid)
+        method = 'POST'
+        payload = self._disk_config(size_gb=size_gb, index=index, storage_container_uuid=storage_container_uuid,
+                                    storage_container_name=storage_container_name, clusteruuid=clusteruuid)
+        payload['volume_group_uuid'] = volume_group_uuid
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk added to volume group "{0}" successfully'.format(volume_group_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be added to volume group "{0}". Task details: {1}'.format(volume_group_uuid,
+                                                                                                             task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+
+    def remove_disk_by_volume_group_name(self, volume_group_name:str, index:int, wait:bool=True, clusteruuid=None):
+        """Remove a disk from a volume group by volume group name.
+
+        :param volume_group_name: The name of the volume group to which the new disk is to be added.
+        :type volume_group_name: str
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully removed to the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.remove_volume_by_volume_group_name')
+
+        logger.debug('searching for volume group named "{0}"'.format(volume_group_name))
+        vg = self.search_volume_groups_name(name=volume_group_name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group named "{0}"'.format(volume_group_name))
+            volume_group_uuid = vg.get('uuid')
+        else:
+            logger.warning('cannot find volume group named "{0}"'.format(volume_group_name))
+            raise ValueError()
+
+        volume_config = {
+            'volume_group_uuid': volume_group_uuid,
+            'index': index,
+        }
+        return self.remove_disk_by_volume_group_uuid(wait=wait, clusteruuid=clusteruuid, **volume_config)
+
+    def remove_disk_by_volume_group_uuid(self, volume_group_uuid:str, index:int, wait:bool=True, clusteruuid=None):
+        """Remove a disk from a volume group by volume group uuid.
+
+        :param volume_group_uuid: The uuid of the volume group to which the new disk is to be added.
+        :type volume_group_uuid: str
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully removed to the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.remove_disk_by_volume_group_uuid')
+
+        logger.debug('searching for volume group "{0}"'.format(volume_group_uuid))
+        vg = self.search_volume_groups_uuid(uuid=volume_group_uuid, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group "{0}"'.format(volume_group_uuid))
+        else:
+            logger.warning('cannot find volume group "{0}"'.format(volume_group_uuid))
+            raise ValueError()
+
+        if vg.get('disk_list'):
+            index_exists = next(item for item in vg.get('disk_list') if item['index'] == index)
+            if index_exists:
+                logger.debug('found volume group disk index "{0}". Details "{1}"'.format(index, index_exists))
+            else:
+                raise ValueError()
+        else:
+            raise ValueError()
+
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        version = 'v2.0'
+        uri = '/volume_groups/{0}/disks/{1}'.format(volume_group_uuid, index)
+        method = 'DELETE'
+        payload = None
+
+        task = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+        if wait:
+            if task.get('task_uuid'):
+                task_obj = Task(api_client=self.api_client)
+                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task.get('task_uuid'), max_refresh_secs=1, clusteruuid=clusteruuid))
+                thread.start()
+
+                task_obj.task_status.wait()
+                if task_obj.task_result[task.get('task_uuid')].get('progress_status').lower() == 'succeeded':
+                    logger.debug('disk deleted from volume group "{0}" successfully'.format(volume_group_uuid))
+                    return True
+                else:
+                    logger.warning('disk failed to be deleted from volume group "{0}". Task details: {1}'.format(volume_group_uuid,
+                                                                                                                 task_obj.task_result[task.get('task_uuid')]))
+                    return False
+            else:
+                return False
+        else:
+            return True
+
+    def update_disk_by_volume_group_name(self, volume_group_name:str, index:int, size_gb:int=None, preserve_data:bool=True, flash_mode:bool=False,
+                                         clusteruuid=None):
+        """Add a new disk to an existing volume group using the volume group name.
+
+        :param volume_group_name: The name of the volume group to which the new disk is to be added.
+        :type volume_group_name: str
+        :param size_gb: The size of the volume group disk to add in GB.
+        :type size_gb: int
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param preserve_data: Whether data on this volume should be preserved during the update. (default=True)
+        :type preserve_data: bool, optional
+        :param flash_mode: Whether to enable flash mode on this volume group. (defaults=False)
+        :type flash_mode: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully updated on the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.update_disk_by_volume_group_name')
+
+        logger.debug('searching for volume group named "{0}"'.format(volume_group_name))
+        vg = self.search_volume_groups_name(name=volume_group_name, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group named "{0}"'.format(volume_group_name))
+            volume_group_uuid = vg.get('uuid')
+        else:
+            logger.warning('cannot find volume group named "{0}"'.format(volume_group_name))
+            raise ValueError()
+
+        volume_config = {
+            'volume_group_uuid': volume_group_uuid,
+            'index': index,
+            'size_gb': size_gb,
+            'preserve_data': preserve_data,
+            'flash_mode': flash_mode,
+        }
+        return self.update_disk_by_volume_group_uuid(clusteruuid=clusteruuid, **volume_config)
+
+    def update_disk_by_volume_group_uuid(self, volume_group_uuid:str, index:int, size_gb:int=None, preserve_data:bool=True, flash_mode:bool=False,
+                                         clusteruuid=None):
+        """Add a new disk to an existing volume group using the volume group uuid.
+
+        :param volume_group_uuid: The uuid of the volume group to which the new disk is to be added.
+        :type volume_group_uuid: str
+        :param size_gb: The size of the volume group disk to add in GB.
+        :type size_gb: int
+        :param index: The SCSI index for the volume group on this VM to be detached.
+        :type index: int, optional
+        :param preserve_data: Whether data on this volume should be preserved during the update. (default=True)
+        :type preserve_data: bool, optional
+        :param flash_mode: Whether to enable flash mode on this volume group. (defaults=False)
+        :type flash_mode: bool, optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+        :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
+                            `connection_type` is set to `pc`.
+        :type clusteruuid: str, optional
+        :return: True or False to indicate whether the disk was successfully updated on the volume group.
+        :rtype: bool
+        """
+        logger = logging.getLogger('ntnx_api.prism.StorageVolume.update_disk_by_volume_group_uuid')
+        existing_volume = None
+        bm_size = None
+
+        logger.debug('searching for volume group "{0}"'.format(volume_group_uuid))
+        vg = self.search_volume_groups_uuid(uuid=volume_group_uuid, refresh=True, clusteruuid=clusteruuid)
+        if vg:
+            logger.debug('found volume group "{0}"'.format(volume_group_uuid))
+        else:
+            logger.warning('cannot find volume group "{0}"'.format(volume_group_uuid))
+            raise ValueError()
+
+        if vg.get('disk_list'):
+            existing_volume = next(item for item in vg.get('disk_list') if item['index'] == index)
+            if existing_volume:
+                logger.debug('found volume group disk index "{0}". Details "{1}"'.format(index, existing_volume))
+            else:
+                raise ValueError()
+        else:
+            raise ValueError()
+
+        if size_gb:
+            bm_size_gb = bitmath.GiB(size_gb)
+            bm_size = bm_size_gb.to_Byte()
+            if existing_volume.get('vmdisk_size_bytes') > bm_size:
+                raise ValueError()
+
+        params = {}
+        if clusteruuid:
+            params['proxyClusterUuid'] = clusteruuid
+
+        version = 'v2.0'
+        uri = '/volume_groups/{0}/disks'.format(volume_group_uuid)
+        method = 'PUT'
+        payload = {
+            'flash_mode_enabled': flash_mode,
+            'index': index,
+            'volume_group_uuid': volume_group_uuid,
+            'upgrade_spec': {
+                'preserve_data': preserve_data,
+                'size': int(bm_size) or existing_volume.get('vmdisk_size_bytes'),
+            },
+        }
+
+        if flash_mode and not vg.get('flash_mode_enabled'):
+            logger.warning('cannot enable "flash_mode" as it is not enabled on the parent volume group.')
+            payload.pop('flash_mode_enabled')
+
+        result = self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
+
+        if result:
+            return True
+        else:
+            return False
+
 
 class Task(object):
     """A class to represent a Nutanix Clusters Task object.
@@ -3847,6 +6376,7 @@ class Task(object):
                 logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('progress_status').lower()))
         self.task_result[task_uuid] = task_status
         self.task_status.set()
+
 
 class NetworkSwitch(object):
     """A class to represent a Nutanix Cluster AHV vSwitch object.
@@ -4292,7 +6822,7 @@ class Network(object):
         logger = logging.getLogger('ntnx_api.prism.Network.delete')
         network = self.search_name(name=name, clusteruuid=clusteruuid, refresh=True)
         if network:
-            return self.delete_uuid(network.get('uuid'))
+            return self.delete_uuid(network.get('uuid'), clusteruuid=clusteruuid)
         else:
             return False
 
@@ -4316,7 +6846,8 @@ class Network(object):
             params['proxyClusterUuid'] = clusteruuid
 
         try:
-            self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code)
+            result = self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method, response_code=response_code)
+            logger.info('result "{0}"'.format(result))
             return True
 
         except:

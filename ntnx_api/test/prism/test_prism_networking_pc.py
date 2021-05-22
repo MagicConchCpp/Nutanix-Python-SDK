@@ -10,7 +10,7 @@ network_cleanup = []
 
 
 def _api():
-    return PrismApi(ip_address='192.168.1.7', username='admin', password='uwpOF!1pfQEbTWHWv*kv0HGLNL&QD^4u')
+    return PrismApi(ip_address='192.168.1.44', username='admin', password='fUUif4l0CF!iPVv2mpE6wbT9&Rf5tw')
 
 
 def test_return_networks_list():
