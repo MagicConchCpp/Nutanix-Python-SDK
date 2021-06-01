@@ -3125,7 +3125,7 @@ class Vms(object):
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
-        :return: True or False to indicate whether the VM was sucessfully created.
+        :return: True or False to indicate whether the VM was successfully created.
         :rtype: bool
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.create')
@@ -4608,6 +4608,10 @@ class Images(object):
 
         for entity in self.images.get(clusteruuid):
             if entity.get('uuid') == uuid:
+                found = entity
+                break
+
+            if entity.get('vm_disk_id') == uuid:
                 found = entity
                 break
 
