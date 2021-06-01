@@ -3125,11 +3125,7 @@ class Vms(object):
         :param clusteruuid: A cluster UUID to define the specific cluster to query. Only required to be used when the :class:`ntnx.client.ApiClient`
                             `connection_type` is set to `pc`.
         :type clusteruuid: str, optional
-<<<<<<< HEAD
-        :return: True or False to indicate whether the VM was sucessfully created.
-=======
         :return: True or False to indicate whether the VM was successfully created.
->>>>>>> develop
         :rtype: bool
         """
         logger = logging.getLogger('ntnx_api.prism.Vms.create')
@@ -4312,10 +4308,12 @@ class Vms(object):
         if sockets:
             required_power_state = 'off'
             payload['sockets'] = sockets
+        else:
+            sockets = vm.get('sockets')
 
         if vcpus:
             required_power_state = 'off'
-            payload['num_vcpus'] = vcpus
+            payload['num_vcpus'] = (vcpus/sockets)
 
         if timezone:
             payload['timezone'] = timezone

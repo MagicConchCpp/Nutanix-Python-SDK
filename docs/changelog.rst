@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.4.2", "6/1/2021", "Updated vCPU/socket calculation for Vms.update to match that in Vms.create."
     "1.4.1", "6/1/2021", "Updated Images.search_uuid to also check for a match with the uuid of the image disk."
     "1.4.0", "5/20/2021", "Added functions to the VMs class for CRUD operations to related to the management of virtual machines. Added function to the VolumeGroups class for CRUD operations to related to the management of volumes and volume groups."
     "1.3.1", "4/14/2021", "Added NetworkSwitch.get & NetworkSwitch.search_name to check network bridge configuration. Added Network.get, Network.search_uuid, Network.search_name, Network.search_vlan, Network.create, Network.update, Network.delete_name and Network.delete_uuid to manage AHV networks. Updated StorageContainer CRUD function to only pass updated values."
