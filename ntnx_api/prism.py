@@ -4368,7 +4368,7 @@ class Vms(object):
         elif current_power_state != required_power_state and not force:
             raise ValueError()
 
-    def clone_name(self, source_name:str, name:str, vcpus:int=None, memory_gb:int=None, sockets:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
+    def clone_name(self, source_name:str, name:str, cores:int=None, sockets:int=None, memory_gb:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
                    wait:bool=True, clusteruuid:str=None):
         """Clones an existing virtual machine based on the provided virtual machine name.
 
@@ -4376,12 +4376,12 @@ class Vms(object):
         :type source_name: str
         :param name: The name for the new virtual machine.
         :type name: str
-        :param vcpus: The number of vCPUs to be assigned to this VM
-        :type vcpus: int
-        :param memory_gb: The amount of memory in GB to be assigne to this VM
-        :type memory_gb: int
+        :param cores: The number of virtual CPU cores per virtual CPU socket
+        :type cores: int
         :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
         :type sockets: int, optional
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
         :param nics: A list of NIC dicts to be added to this VM (default='null').
 
             The dictionary format per-NIC is as follows::
@@ -4416,13 +4416,13 @@ class Vms(object):
         uuid = self.search_name(name=source_name, clusteruuid=clusteruuid, refresh=True).get('uuid')
         if uuid:
             logger.debug('cloning vm {0} on cluster {1}'.format(name, clusteruuid))
-            return self.clone_uuid(source_uuid=uuid, name=name, vcpus=vcpus, memory_gb=memory_gb, sockets=sockets, nics=nics,
+            return self.clone_uuid(source_uuid=uuid, name=name, cores=cores, memory_gb=memory_gb, sockets=sockets, nics=nics,
                                    sysprep=sysprep, cloudinit=cloudinit, wait=wait, clusteruuid=clusteruuid)
         else:
             logger.warning('vm {0} not found on cluster {1}'.format(name, uuid))
             return False
 
-    def clone_uuid(self, source_uuid:str, name:str, vcpus:int=None, memory_gb:int=None, sockets:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
+    def clone_uuid(self, source_uuid:str, name:str, cores:int=None, sockets:int=None, memory_gb:int=None, nics:list=[], sysprep:str=None, cloudinit:str=None,
                    wait:bool=True, clusteruuid:str=None):
         """Clones an existing virtual machine based on the provided virtual machine uuid.
 
@@ -4430,12 +4430,12 @@ class Vms(object):
         :type source_uuid: str
         :param name: The name for the new virtual machine.
         :type name: str
-        :param vcpus: The number of vCPUs to be assigned to this VM
-        :type vcpus: int
-        :param memory_gb: The amount of memory in GB to be assigne to this VM
-        :type memory_gb: int
+        :param cores: The number of virtual CPU cores per virtual CPU socket
+        :type cores: int
         :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
         :type sockets: int, optional
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
         :param nics: A list of NIC dicts to be added to this VM (default='null').
 
             The dictionary format per-NIC is as follows::
@@ -4496,8 +4496,8 @@ class Vms(object):
         if sockets:
             spec['num_vcpus'] = sockets
 
-        if vcpus:
-            spec['num_cores_per_vcpu'] = (vcpus/spec['num_vcpus'])
+        if cores:
+            spec['num_cores_per_vcpu'] = cores
 
         if memory_gb:
             bm_memory_gb = bitmath.GB(memory_gb)
