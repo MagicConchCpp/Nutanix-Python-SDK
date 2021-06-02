@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.4.3", "6/1/2021", "Changed Vm create/update terminology for CPU allocation to aid in transparency. Changed terminology to core/socket rather than vcpu/socket."
     "1.4.2", "6/1/2021", "Updated vCPU/socket calculation for Vms.update to match that in Vms.create."
     "1.4.1", "6/1/2021", "Updated Images.search_uuid to also check for a match with the uuid of the image disk."
     "1.4.0", "5/20/2021", "Added functions to the VMs class for CRUD operations to related to the management of virtual machines. Added function to the VolumeGroups class for CRUD operations to related to the management of volumes and volume groups."
