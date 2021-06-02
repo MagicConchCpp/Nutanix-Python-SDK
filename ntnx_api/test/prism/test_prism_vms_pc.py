@@ -37,7 +37,7 @@ def test_vm_create_with_vdisks():
         result = False
         vm_config = {
             'name': 'api_test_v2_vdisk_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -70,7 +70,7 @@ def test_vm_create_with_vdisk_nic():
         result = False
         vm_config = {
             'name': 'api_test_v2_vdisk_nic_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -106,7 +106,7 @@ def test_vm_create_with_vdisk_nic_ipam():
         result = False
         vm_config = {
             'name': 'api_test_v2_vdisk_nic_ipam_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -144,7 +144,7 @@ def test_return_v2_vm_create_with_vdisk_nic_ipam_ip():
         result = False
         vm_config = {
             'name': 'api_test_v2_vdisk_nic_ipam_ip_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -182,7 +182,7 @@ def test_vm_create_from_image_nic_ipam():
         result = False
         vm_config = {
             'name': 'api_test_v2_image_nic_ipam_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -217,7 +217,7 @@ def test_vm_create_from_image_vg_nic_ipam():
         result = False
         vm_config = {
             'name': 'api_test_v2_image_vg_nic_ipam_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -255,7 +255,7 @@ def test_vm_create_failure():
         result = False
         vm_config = {
             'name': 'api_test_v2_failure_{0}'.format(random_string),
-            'vcpus': 16,
+            'cores': 16,
             'memory_gb': 128,
             'add_cdrom': True,
             'disks': [
@@ -288,7 +288,7 @@ def test_vm_clone():
         result = False
         vm_config = {
             'name': 'api_test_v2_clone_original_{0}'.format(random_string),
-            'vcpus': 1,
+            'cores': 1,
             'memory_gb': 0.1,
             'add_cdrom': True,
             'power_state': 'off',
@@ -316,7 +316,7 @@ def test_vm_clone():
         vm_clone_config_2 = {
             'source_name': 'api_test_v2_clone_original_{0}'.format(random_string),
             'name': 'api_test_v2_clone_2_{0}'.format(random_string),
-            'vcpus': 2,
+            'cores': 2,
             'memory_gb': 128,
         }
         results.append(vms_obj.clone_name(clusteruuid=each_uuid, **vm_clone_config_2))
