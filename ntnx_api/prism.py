@@ -3033,7 +3033,7 @@ class Vms(object):
 
         return serial_port
 
-    def create(self, name:str, vcpus:int, memory_gb:int, sockets:int=1, vcpu_reservation_hz:int=0, memory_reservation_gb:int=0, description:str='',
+    def create(self, name:str, cores:int, memory_gb:int, sockets:int=1, vcpu_reservation_hz:int=0, memory_reservation_gb:int=0, description:str='',
                   power_state:str='on', disks:list=[], storage_container_uuid:str=None, nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str='UTC',
                   sysprep:str=None, cloudinit:str=None, add_cdrom:bool=True, ha_priority:int=0, machine_type:str='pc', wait:bool=True, clusteruuid:str=None):
         """ Create a new virtual machine.
@@ -3042,12 +3042,12 @@ class Vms(object):
         :type name: str
         :param description: A description for the VM (default='')
         :type description: str, optional
-        :param vcpus: The number of vCPUs to be assigned to this VM
-        :type vcpus: int
-        :param memory_gb: The amount of memory in GB to be assigne to this VM
-        :type memory_gb: int
+        :param cores: The number of virtual CPU cores per virtual CPU socket
+        :type cores: int
         :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
         :type sockets: int, optional
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
         :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
         :type vcpu_reservation_hz: int, optional
         :param memory_reservation_gb: An amount of memory to lock to this VM. Only applicable on the ESXi hypervisor. (default=0)
@@ -3154,8 +3154,8 @@ class Vms(object):
             'name': name,
             'description': description,
             'memory_mb': int(bm_memory_mb),
+            'num_vcpus': cores,
             'sockets': sockets,
-            'num_vcpus': (vcpus/sockets),
             'power_state': 'OFF',
             'timezone': timezone,
             'ha_priority': ha_priority,
@@ -4054,7 +4054,7 @@ class Vms(object):
             else:
                 return False
 
-    def update_name(self, name:str, new_name:str=None, vcpus:int=None, memory_gb:int=None, sockets:int=None, vcpu_reservation_hz:int=None,
+    def update_name(self, name:str, new_name:str=None, cores:int=None, sockets:int=None, memory_gb:int=None, vcpu_reservation_hz:int=None,
                     memory_reservation_gb:int=None, description:str=None, disks:list=[], nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str=None,
                     add_cdrom:bool=None, ha_priority:int=None, force:bool=False, wait:bool=True, clusteruuid:str=None):
         """Updates a specific virtual machine by the vm name provided.
@@ -4063,12 +4063,12 @@ class Vms(object):
         :type name: str
         :param new_name: A new name for the virtual machine.
         :type new_name: str, optional
-        :param vcpus: The number of vCPUs to be assigned to this VM
-        :type vcpus: int
-        :param memory_gb: The amount of memory in GB to be assigne to this VM
-        :type memory_gb: int
+        :param cores: The number of virtual CPU cores per virtual CPU socket
+        :type cores: int
         :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
         :type sockets: int, optional
+        :param memory_gb: The amount of memory in GB to be assigne to this VM
+        :type memory_gb: int
         :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
         :type vcpu_reservation_hz: int, optional
         :param memory_reservation_gb: An amount of memory to lock to this VM. Only applicable on the ESXi hypervisor. (default=0)
@@ -4157,7 +4157,7 @@ class Vms(object):
                 vm_config = {
                     'uuid': vm.get('uuid'),
                     'new_name': new_name,
-                    'vcpus': vcpus,
+                    'cores': cores,
                     'memory_gb': memory_gb,
                     'sockets': sockets,
                     'vcpu_reservation_hz': vcpu_reservation_hz,
@@ -4178,7 +4178,7 @@ class Vms(object):
             else:
                 raise ValueError()
 
-    def update_uuid(self, uuid:str, new_name:str=None, vcpus:int=None, memory_gb:int=None, sockets:int=None, vcpu_reservation_hz:int=None,
+    def update_uuid(self, uuid:str, new_name:str=None, cores:int=None, sockets:int=None, memory_gb:int=None, vcpu_reservation_hz:int=None,
                     memory_reservation_gb:int=None, description:str=None, disks:list=[], nics:list=[], gpus:list=[], serial_ports:list=[], timezone:str=None,
                     add_cdrom:bool=None, ha_priority:int=None, force:bool=False, wait:bool=True, clusteruuid:str=None):
         """Updates a specific virtual machine by the uuid provided
@@ -4187,10 +4187,10 @@ class Vms(object):
         :type uuid: str
         :param new_name: A new name for the virtual machine.
         :type new_name: str, optional
-        :param vcpus: The number of vCPUs to be assigned to this VM
-        :type vcpus: int
         :param memory_gb: The amount of memory in GB to be assigne to this VM
         :type memory_gb: int
+        :param cores: The number of virtual CPU cores per virtual CPU socket
+        :type cores: int
         :param sockets: The number of virtual CPU sockets to distribute the defined vCPUs over (default=1)
         :type sockets: int, optional
         :param vcpu_reservation_hz: A CPU reservation in hz for this VM. Only applicable on the ESXi hypervisor. (default=0)
@@ -4305,15 +4305,13 @@ class Vms(object):
             bm_memory_mb = bm_memory_gb.to_MB()
             payload['memory_mb'] = int(bm_memory_mb)
 
+        if cores:
+            required_power_state = 'off'
+            payload['num_vcpus'] = cores
+
         if sockets:
             required_power_state = 'off'
             payload['sockets'] = sockets
-        else:
-            sockets = vm.get('sockets')
-
-        if vcpus:
-            required_power_state = 'off'
-            payload['num_vcpus'] = (vcpus/sockets)
 
         if timezone:
             payload['timezone'] = timezone
