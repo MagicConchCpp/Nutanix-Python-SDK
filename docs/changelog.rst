@@ -7,6 +7,7 @@ A log of changes by version and date.
     :header: "Version", "Date", "Notes"
     :widths: 10, 10, 60
 
+    "1.5.0, "6/10/2021", "Added prism.Categories and prism.Projects to enhance Prism Central category & project management. Updated prism.Tasks.watch_task to also return task status via the v3 API for Prism Central jobs. Redirected original category and project functions from prism.Config to the new Classes. Added global function to search nested dictionaries for key/value presence"
     "1.4.3", "6/1/2021", "Changed Vm create/update terminology for CPU allocation to aid in transparency. Changed terminology to core/socket rather than vcpu/socket."
     "1.4.2", "6/1/2021", "Updated vCPU/socket calculation for Vms.update to match that in Vms.create."
     "1.4.1", "6/1/2021", "Updated Images.search_uuid to also check for a match with the uuid of the image disk."
