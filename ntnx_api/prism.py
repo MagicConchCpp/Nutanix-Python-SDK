@@ -55,6 +55,16 @@ StorageVolume
 ^^^^^^^^^^^^^
 .. autoclass:: ntnx_api.prism.StorageVolume
     :members:
+
+Prism Central Categories
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: ntnx_api.prism.Categories
+    :members:
+
+Prism Central Projects
+^^^^^^^^^^^^^^^^^^^^^^
+.. autoclass:: ntnx_api.prism.Projects
+    :members:
 """
 
 from __future__ import (absolute_import, division, print_function)
@@ -128,6 +138,24 @@ logging.config.dictConfig({
     }
 })
 
+# Global functions
+def keys_exists(element, *keys):
+    '''
+    Check if *keys (nested) exists in `element` (dict).
+    '''
+    if not isinstance(element, dict):
+        raise AttributeError('keys_exists() expects dict as first argument.')
+    if len(keys) == 0:
+        raise AttributeError('keys_exists() expects at least two arguments, one given.')
+
+    _element = element
+    for key in keys:
+        try:
+            _element = _element[key]
+        except KeyError:
+            return False
+    return True
+
 
 class Config(object):
     """A class to represent the configuration of the Nutanix Prism Instance
@@ -174,30 +202,45 @@ class Config(object):
         self.ui_config = self.api_client.request(uri=uri, api_version='v1', payload=payload, params=params)
         return self.ui_config[clusteruuid]
 
+    @deprecated(
+        reason="""The :class:`.Config` is being reorganized and this function has been moved ot a class dedicated to the management of Categories 
+        :class:`.Categories`.
+        """,
+        version='1.5.0',
+    )
     def get_categories(self):
         """Retrieve data for all categories.
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_categories')
-        params = {}
+        category_obj = Categories(api_client=self.api_client)
+        self.categories = category_obj.get_categories()
 
-        if self.api_client.connection_type == "pc":
-            uri = '/categories/list'
-            payload = {
-                "kind": "category",
-                "offset": 0,
-                "length": 2147483647
-            }
-            self.categories = self.api_client.request(uri=uri, payload=payload, params=params).get(
-                'entities')
-
-        else:
-            # pe does not have category data
-            self.categories = {}
+        # params = {}
+        #
+        # if self.api_client.connection_type == "pc":
+        #     uri = '/categories/list'
+        #     payload = {
+        #         "kind": "category",
+        #         "offset": 0,
+        #         "length": 2147483647
+        #     }
+        #     self.categories = self.api_client.request(uri=uri, payload=payload, params=params).get(
+        #         'entities')
+        #
+        # else:
+        #     # pe does not have category data
+        #     self.categories = {}
 
         return self.categories
 
+    @deprecated(
+        reason="""The :class:`.Config` is being reorganized and this function has been moved ot a class dedicated to the management of Categories 
+        :class:`.Categories`.
+        """,
+        version='1.5.0',
+    )
     def get_category_keys(self, category):
         """Retrieve data for all keys belonging to a specific category.
 
@@ -207,24 +250,32 @@ class Config(object):
         .. note:: Will only return data when `connection_type=='pc'`
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_category_keys')
-        params = {}
+        category_obj = Categories(api_client=self.api_client)
+        self.category_keys = category_obj.get_category_values(category=category)
 
-        if self.api_client.connection_type == "pc":
-            uri = '/categories/{0}/list'.format(category)
-            payload = {
-                "kind": "category",
-                "offset": 0,
-                "length": 2147483647
-            }
-            self.category_keys = self.api_client.request(uri=uri, payload=payload, params=params).get(
-                'entities')
-
-        else:
-            # pe does not expose category data
-            self.category_keys = {}
+        # params = {}
+        # if self.api_client.connection_type == "pc":
+        #     uri = '/categories/{0}/list'.format(category)
+        #     payload = {
+        #         "kind": "category",
+        #         "offset": 0,
+        #         "length": 2147483647
+        #     }
+        #     self.category_keys = self.api_client.request(uri=uri, payload=payload, params=params).get(
+        #         'entities')
+        #
+        # else:
+        #     # pe does not expose category data
+        #     self.category_keys = {}
 
         return self.category_keys
 
+    @deprecated(
+        reason="""The :class:`.Config` is being reorganized and this function has been moved ot a class dedicated to the management of Categories 
+        :class:`.Categories`.
+        """,
+        version='1.5.0',
+    )
     def get_category_key_usage(self, category, key):
         """Retrieve data for all vms or hosts belonging to a specific category & key.
 
@@ -237,61 +288,79 @@ class Config(object):
             Will only return data when `connection_type=='pc'`
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_category_key_usage')
-        params = {}
-        result = []
+        category_obj = Categories(api_client=self.api_client)
+        result = category_obj.get_category_value_usage(category=category, value=key)
 
-        if self.api_client.connection_type == "pc":
-            uri = '/category/query'
-            payload = {
-                "group_member_count": 2147483647,
-                "group_member_offset": 0,
-                "usage_type": "APPLIED_TO",
-                "category_filter": {
-                    "type": "CATEGORIES_MATCH_ANY",
-                    "kind_list": ["vm", "host"],
-                    "params": {
-                        category: key
-                    }
-                }
-            }
-            matches = self.api_client.request(uri=uri, payload=payload, params=params).get(
-                'results')
-
-            for match in matches:
-                for kind_reference in match.get('kind_reference_list'):
-                    item = {
-                        "name": kind_reference.get('name'),
-                        "uuid": kind_reference.get('uuid'),
-                        "type": match.get('kind')
-                    }
-                    result.append(item)
-
-        else:
-            # pe does not expose category data
-            pass
+        # params = {}
+        # result = []
+        #
+        # if self.api_client.connection_type == "pc":
+        #     uri = '/category/query'
+        #     payload = {
+        #         "group_member_count": 2147483647,
+        #         "group_member_offset": 0,
+        #         "usage_type": "APPLIED_TO",
+        #         "category_filter": {
+        #             "type": "CATEGORIES_MATCH_ANY",
+        #             "kind_list": ["vm", "host"],
+        #             "params": {
+        #                 category: key
+        #             }
+        #         }
+        #     }
+        #     matches = self.api_client.request(uri=uri, payload=payload, params=params).get(
+        #         'results')
+        #
+        #     for match in matches:
+        #         for kind_reference in match.get('kind_reference_list'):
+        #             item = {
+        #                 "name": kind_reference.get('name'),
+        #                 "uuid": kind_reference.get('uuid'),
+        #                 "type": match.get('kind')
+        #             }
+        #             result.append(item)
+        #
+        # else:
+        #     # pe does not expose category data
+        #     pass
 
         return result
 
+    @deprecated(
+        reason="""The :class:`.Config` is being reorganized and this function has been moved ot a class dedicated to the management of Projects 
+        :class:`.Projects`.
+        """,
+        version='1.5.0',
+    )
     def get_projects(self):
         """Retrieve data for all projects.
 
         .. note:: Will only return data when `connection_type=='pc'`
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_projects')
-        params = {}
-        self.projects = {}
+        project_obj = Projects(api_client=self.api_client)
+        self.projects = project_obj.get()
 
-        if self.api_client.connection_type == "pc":
-            uri = '/projects/list'
-            payload = {
-                "kind": "project",
-                "offset": 0,
-                "length": 2147483647
-            }
-            self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
+        # params = {}
+        # self.projects = {}
+        #
+        # if self.api_client.connection_type == "pc":
+        #     uri = '/projects/list'
+        #     payload = {
+        #         "kind": "project",
+        #         "offset": 0,
+        #         "length": 2147483647
+        #     }
+        #     self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
 
         return self.projects
 
+    @deprecated(
+        reason="""The :class:`.Config` is being reorganized and this function has been moved ot a class dedicated to the management of Projects 
+        :class:`.Projects`.
+        """,
+        version='1.5.0',
+    )
     def get_project_usage(self, project_name):
         """Retrieve vms that belong to a specific project.
 
@@ -301,31 +370,34 @@ class Config(object):
         .. note:: Will only return data when `connection_type=='pc'`
         """
         logger = logging.getLogger('ntnx_api.prism.Config.get_project_usage')
-        params = {}
-        result = []
+        project_obj = Projects(api_client=self.api_client)
+        return project_obj.get_usage(name=project_name, refresh=True)
 
-        if self.api_client.connection_type == "pc":
-            uri = '/vms/list'
-            payload = {
-                "kind": "vm",
-                "offset": 0,
-                "length": 2147483647
-            }
-            vms = self.api_client.request(uri=uri, payload=payload, params=params)
-
-            for vm in vms:
-                if vm.get('metadata'):
-                    project_kind = vm.get('metadata').get('project_reference').get('kind')
-                    vm_project_name = vm.get('metadata').get('project_reference').get('name')
-                    if 'project_reference' in vm.get('metadata') and project_kind == 'project' and \
-                            vm_project_name == project_name:
-                        item = {
-                            'name': vm.get('status').get('name'),
-                            'uuid': vm.get('metadata').get('uuid')
-                        }
-                        result.append(item)
-
-        return result
+        # params = {}
+        # result = []
+        #
+        # if self.api_client.connection_type == "pc":
+        #     uri = '/vms/list'
+        #     payload = {
+        #         "kind": "vm",
+        #         "offset": 0,
+        #         "length": 2147483647
+        #     }
+        #     vms = self.api_client.request(uri=uri, payload=payload, params=params)
+        #
+        #     for vm in vms:
+        #         if vm.get('metadata'):
+        #             project_kind = vm.get('metadata').get('project_reference').get('kind')
+        #             vm_project_name = vm.get('metadata').get('project_reference').get('name')
+        #             if 'project_reference' in vm.get('metadata') and project_kind == 'project' and \
+        #                     vm_project_name == project_name:
+        #                 item = {
+        #                     'name': vm.get('status').get('name'),
+        #                     'uuid': vm.get('metadata').get('uuid')
+        #                 }
+        #                 result.append(item)
+        #
+        # return result
 
     def _add_ui_setting(self, setting_type, setting_key, setting_value, clusteruuid=None):
         """Add UI setting for a specific cluster
@@ -4543,6 +4615,15 @@ class Vms(object):
             else:
                 return False
 
+    def set_categories(self, category):
+        """
+        """
+        pass
+
+    def set_cateories(self, categories, create_missing=True):
+        """
+        """
+        pass
 
 class Images(object):
     """A class to represent a Nutanix Clusters Images
@@ -6345,15 +6426,17 @@ class Task(object):
         """
         logger = logging.getLogger('ntnx_api.prism.Task.get_task')
         params = {}
+        version = 'v3'
 
         if clusteruuid:
             params['proxyClusterUuid'] = clusteruuid
+            version = 'v2.0'
 
         uri = '/tasks/{0}'.format(task_uuid)
         method = 'GET'
         payload = {}
 
-        return self.api_client.request(uri=uri, api_version='v2.0', payload=payload, params=params, method=method)
+        return self.api_client.request(uri=uri, api_version=version, payload=payload, params=params, method=method)
 
     def watch_task(self, task_uuid, clusteruuid=None, max_refresh_secs=60):
         """Watches a specific task based until it finishes. Updates task status in ResponseList self.task_result within the class
@@ -6372,12 +6455,20 @@ class Task(object):
         while not task_complete:
             time.sleep(random() * max_refresh_secs)
             task_status = self.get_task(task_uuid=task_uuid, clusteruuid=clusteruuid)
-            if not task_status.get('progress_status').lower() in ['queued', 'running', 'none']:
-                task_complete = True
-                logger.info('task {0} finished'.format(task_uuid))
-                logger.debug('task {0} details {1}'.format(task_uuid, task_status))
+            if not clusteruuid:
+                if not task_status.get('status').lower() in ['queued', 'running']:
+                    task_complete = True
+                    logger.info('task {0} finished'.format(task_uuid))
+                    logger.debug('task {0} details {1}'.format(task_uuid, task_status))
+                else:
+                    logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('status').lower()))
             else:
-                logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('progress_status').lower()))
+                if not task_status.get('progress_status').lower() in ['queued', 'running', 'none']:
+                    task_complete = True
+                    logger.info('task {0} finished'.format(task_uuid))
+                    logger.debug('task {0} details {1}'.format(task_uuid, task_status))
+                else:
+                    logger.info('task {0} in {1} state'.format(task_uuid, task_status.get('progress_status').lower()))
         self.task_result[task_uuid] = task_status
         self.task_status.set()
 
@@ -6856,3 +6947,841 @@ class Network(object):
 
         except:
             return False
+
+
+@versionadded(
+    reason="""This class combines all functions to manage categories into a single class.
+    """,
+    version='1.5.0',
+)
+class Categories(object):
+    """A class to represent Nutanix Prism Central Categories.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+
+    def __init__(self, api_client):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.__init__')
+        self.api_client = api_client
+        self.task_status = threading.Event()
+        self.task_result = {}
+        self.networks = {}
+        self.categories = {}
+        self.category_values = {}
+        self.category_value_usage = {}
+
+        # Pre-load list of categories
+        self.get_categories(refresh=True)
+
+        # Pre-load list of category values
+        for category in self.categories:
+            self.get_category_values(category=category.get('name'), refresh=True)
+
+    def get_categories(self, refresh=False):
+        """Retrieve data for all categories.
+
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A list of dictionaries describing all categories.
+        :rtype: ResponseList
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.get_categories')
+        params = {}
+        version = 'v3'
+        method = 'POST'
+
+        if self.api_client.connection_type == "pc":
+            if not self.categories or refresh:
+                uri = '/categories/list'
+                payload = {
+                    "kind": "category",
+                    "offset": 0,
+                    "length": 2147483647
+                }
+                self.categories = self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method).get('entities')
+
+        else:
+            # pe does not have category data
+            self.categories = {}
+
+        return self.categories
+
+    def search_category(self, name, refresh=False):
+        """Search for a specific category.
+
+        :param name: Category name
+        :type name: str
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A dictionary describing a single category.
+        :rtype: ResponseDict
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.get_categories')
+        category = {}
+        version = 'v3'
+
+        if self.api_client.connection_type == "pc":
+            if refresh:
+                self.get_categories(refresh=refresh)
+
+            category = next((item for item in self.categories if item["name"] == name), None)
+
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return category
+
+    def get_category_values(self, category, refresh=False):
+        """Retrieve data for all keys belonging to a specific category.
+
+        :param category: Category name
+        :type category: str
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A list of dictionaries describing all category values.
+        :rtype: ResponseList
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.get_category_values')
+        params = {}
+        version = 'v3'
+        method = 'POST'
+
+        if self.api_client.connection_type == "pc":
+            if self.search_category(name=category, refresh=True):
+                if not self.category_values.get(category) or refresh:
+                    uri = '/categories/{0}/list'.format(category)
+                    payload = {
+                        "kind": "category",
+                        "offset": 0,
+                        "length": 2147483647
+                    }
+                    self.category_values[category] = self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method).get('entities')
+            else:
+                logger.warning('Category {0} does not exist.')
+        else:
+            logger.warning('Not connected to a Prism Central.')
+            self.category_keys = {}
+
+        return self.category_values[category]
+
+    def search_category_value(self, category, value, refresh=False):
+        """Search for a specific key within a category.
+
+        :param category: Category name
+        :type category: str
+        :param value: Category value name
+        :type value: str
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A dictionary describing a single category value.
+        :rtype: ResponseDict
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.search_category_value')
+        category_key = {}
+
+        if self.api_client.connection_type == "pc":
+            if refresh:
+                self.get_category_values(category=category, refresh=refresh)
+
+            if self.category_values.get(category):
+                category_key = next((item for item in self.category_values[category] if item["value"] == value), None)
+
+                if category_key:
+                    logger.debug('Category key found.')
+                else:
+                    logger.debug('Category key not found.')
+            else:
+                logger.debug('Category not found.')
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return category_key
+
+    def _query_category_value_usage(self, category, value, kind='vm'):
+        """Retrieve data from the api for a specified resource kind used by a specific category & key.
+
+        :parameter category: Category name
+        :type category: str
+        :parameter value: Category value name
+        :type value: str
+        :param kind: The kind of record to search for. (default='vm')
+        :type kind: str('vm', 'host'), optional
+
+        .. note::
+            Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories._query_category_value_usage')
+        params = {}
+        version = 'v3'
+        method = 'POST'
+
+        if self.api_client.connection_type == "pc":
+            uri = '/category/query'
+            payload = {
+                "group_member_count": 2147483647,
+                "group_member_offset": 0,
+                "usage_type": "APPLIED_TO",
+                "category_filter": {
+                    "type": "CATEGORIES_MATCH_ANY",
+                    "kind_list": [kind],
+                    "params": {
+                        category: [value]
+                    }
+                }
+            }
+            return self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method).get('results')
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+    def get_category_value_usage(self, category, value, refresh=False):
+        """Retrieve data for all vms or hosts belonging to a specific category & value.
+
+        :parameter category: Category name
+        :type category: str
+        :parameter value: Key name
+        :type value: str
+        :param refresh: Whether to refresh an existing dataset if it exists. (default=False)
+        :type refresh: bool, optional
+
+        :returns: A list of dictionaries containing where the category & value key-pair is in use.
+
+            The per-item dictionary format is;
+                - name (str). The name of the VM found.
+                - uuid (str). The UUID of the VM found.
+                - kind (str). The kind of record found. Choice of 'vm', 'host', 'cluster'
+
+        :rtype: ResponseList
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.get_category_value_usage')
+        result = []
+
+        if self.api_client.connection_type == "pc":
+            if not keys_exists(self.category_value_usage, category, value) or refresh:
+                kinds = ['vm', 'host', 'cluster']
+                for kind in kinds:
+                    for category_value_use in self._query_category_value_usage(category=category, value=value, kind=kind):
+                        if category_value_use.get('kind_reference_list'):
+                            for kind_reference in category_value_use.get('kind_reference_list'):
+                                item = {
+                                    "name": kind_reference.get('name'),
+                                    "uuid": kind_reference.get('uuid'),
+                                    "type": kind,
+                                }
+                                result.append(item)
+                self.category_value_usage.update({category: {value: result}})
+            else:
+                result = self.category_value_usage[category][value]
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return result
+
+    def set_category(self, name, description=''):
+        """Create or update category
+
+        :param name: Name of new category
+        :type name: str
+        :param description: Description for new category
+        :type description: str, optional
+
+        :return: `True` or `False` to indicate whether the category creation or update was successful.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.create_category')
+        version = 'v3'
+        uri = '/categories/{0}'.format(name)
+        params = {}
+        payload = {
+            'name': name,
+            'description': description,
+        }
+        method = 'PUT'
+        result = False
+
+        if self.api_client.connection_type == "pc":
+            self.get_categories()
+            if name not in self.categories:
+                logger.debug('Category "{0}" does not exist. Attempting to create it.'.format(name))
+            else:
+                logger.debug('Category "{0}" already exists. Attempting to update it'.format(name))
+
+            try:
+                self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method)
+                result = True
+
+            except Exception as err:
+                logger.error('Category "{0}" create/update failed. Error details: {1}'.format(name, err))
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return result
+
+    def remove_category(self, name, force=False):
+        """Remove a category
+
+        :param name: Category name
+        :type name: str
+        :param force: If `True` remove category values and also unassign those values from any VM. (default=False)
+        :type force: bool, optional
+
+        :return: `True` or `False` to indicate whether the category removal was successful.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.remove_category')
+        version = 'v3'
+        uri = '/categories/{0}'.format(name)
+        params = {}
+        payload = {}
+        method = 'DELETE'
+        result = False
+
+        if self.api_client.connection_type == "pc":
+            category = self.search_category(name=name)
+
+            if category:
+                if not category.get('system_defined'):
+                    if force:
+                        for category_value in self.get_category_values(category=name, refresh=True):
+                            self.remove_category_value(category=name, value=category_value.get('value'), force=force)
+
+                    if not self.get_category_values(category=name, refresh=True):
+                        try:
+                            self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method)
+                            result = True
+
+                        except Exception as err:
+                            logger.error('Category "{0}" removal failed. Error details: {1}'.format(name, err))
+                            raise
+                    else:
+                        logger.error('Category "{0}" contains keys. Please remove the keys before removing this category.'.format(name))
+                else:
+                    logger.error('Category "{0}" is system defined. This category cannot be removed.')
+            else:
+                logger.warning('Category {0} does not exist.'.format(name))
+
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return result
+
+    def set_category_value(self, category:str, value:str, description:str=''):
+        """Create or update Category value. If the value does not exist it is created, if it does exist it is updated.
+
+        :param category: Category name
+        :type category: str
+        :param value: Name for new category value
+        :type value: str
+        :param description: Description for the new category value
+        :type description: str, optional
+
+        :return: `True` or `False` to indicate whether the category creation or update was successfully.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.set_category_value')
+        result = False
+
+        version = 'v3'
+        uri = '/categories/{0}/{1}'.format(category, value)
+        params = {}
+        payload = {
+            'value': value,
+            'description': description,
+        }
+        method = 'PUT'
+
+        if self.api_client.connection_type == "pc":
+            # if category does not already exist, create it
+            if not self.search_category(name=category):
+                self.set_category(name=category)
+
+            # if category value does not exist, create it
+            if self.search_category_value(category=category, value=value, refresh=True):
+                logger.debug('Category "{0}" value "{1}" does not exist. Attempting to create it.'.format(category, value))
+            else:
+                logger.debug('Category "{0}" value "{1}" exists. Attempting to update it.'.format(category, value))
+
+            try:
+                self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method)
+                logger.info('Category "{0}" value "{1}" create/updated sucessfully.'.format(category, value))
+                result = True
+
+            except Exception as err:
+                logger.error('Category "{0}" value "{1}" create/update failed. Error details: {2}'.format(category, value, err))
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return result
+
+    def remove_category_value(self, category:str, value:str, force=False):
+        """Remove a category value.
+
+        :param category: Category name
+        :type category: str
+        :param value: Name for new category value
+        :type value: str
+        :param force: If `True` remove category values and also unassign those values from any VM. (default=False)
+        :type force: bool, optional
+
+        :return: `True` or `False` to indicate whether the category value removal was successful.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.remove_category_value')
+        version = 'v3'
+        uri = '/categories/{0}/{1}'.format(category, value)
+        params = {}
+        payload = {}
+        method = 'DELETE'
+        results = []
+
+        if self.api_client.connection_type == "pc":
+            category_value = self.search_category_value(category=category, value=value, refresh=True)
+            if category_value:
+                if not category_value.get('system_defined'):
+                    assigned_entities = self.get_category_value_usage(category=category, value=value, refresh=True)
+                    logger.debug('Entities associated with "{0}/{1}": {2}'.format(category, value, assigned_entities))
+                    if assigned_entities and force:
+                        # Remove category/value from any assigned entities
+                        for entity in assigned_entities:
+                            logger.info('Attempting to remove "{0}/{1}" from {2} {3}'.format(category, value, entity.get('uuid'), entity.get('type')))
+                            categories = [{'category': category, 'value': value}]
+                            result = self.unassign_category_value(categories=categories, uuid=entity.get('uuid'), kind=entity.get('type'))
+                            logger.info('{0} removing "{1}/{2}" from {3} {4}'.format(result, category, value, entity.get('uuid'), entity.get('type')))
+                            results.append(result)
+
+                    if assigned_entities and not force:
+                        logger.error('Category/value "{0}/{1}" is current assigned and cannot be removed. Details: {2}'.format(category, value, assigned_entities))
+                        raise
+                    else:
+                        # Try to remove category value
+                        try:
+                            self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method)
+                            results.append(True)
+
+                        except Exception as err:
+                            logger.error('Category/value "{0}/{1}" delete failed. Error details: {2}'.format(category, value, err))
+                            results.append(False)
+                            raise
+                else:
+                    logger.error('Category/value "{0}/{1}" is system defined. This cannot be removed.'.format(category, value))
+                    results.append(False)
+                    raise
+            else:
+                logger.warning('Category/value "{0}/{1}" does not exist.'.format(category, value))
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return all(results)
+
+    def _get_spec(self, uuid:str, kind:str='vm'):
+        """Return the v3 entity specification for the specified uuid and kind.
+
+        :param uuid: UUID of the object to be returned
+        :type uuid: str
+        :param kind: The kind of object to be returned. (default='vm')
+        :type kind: str('vm', 'host', 'cluster'), optional
+
+        :return: A dictionary describing the found virtual machine.
+        :rtype: ResponseDict
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories._get_spec')
+        version = 'v3'
+        spec = {}
+
+        if kind not in ['vm', 'host', 'cluster', ]:
+            raise ValueError('kind must be set to either "vm", "host" or "cluster" not "{0}".'.format(kind))
+
+        if self.api_client.connection_type == "pc":
+            uri = '/{0}s/{1}'.format(kind, uuid)
+            params = {}
+            payload = {}
+            method = 'GET'
+            spec = self.api_client.request(uri=uri, payload=payload, params=params, api_version=version, method=method)
+
+            if spec['status']['state'] == 'COMPLETE':
+                spec.pop('status')
+            else:
+                raise RuntimeError('The {0} "{1}" is not in a state where it can be updated. Check for any existing tasks that may be running.'.format(kind, spec['status']['name']))
+
+        return spec
+
+    def assign_category_value(self, categories:list, uuid:str, kind:str='vm', wait:bool=True):
+        """Assign a list of categories & values to a VM, host or cluster.
+
+        :param categories: A list of of category/value key-pairs.
+
+            The dictionary format for each list item is as follows::
+                - category (str). The category to be assigned.
+                - value (str). The category value to be assigned.
+
+            Examples;
+                1. Add a single category/value - [{'category': 'AppFamily', 'value': 'Databases', }, ]
+                2. Add multiple categories/values - [{'category': 'AppFamily', 'value': 'Databases', }, {'category': 'Environment', 'value': 'Production', }, ]
+
+        :type categories: list
+        :param uuid: UUID of the object to be modified.
+        :type uuid: str
+        :param kind: The kind of object to be modified. (default='vm')
+        :type kind: str('vm', 'host', 'cluster'), optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+
+        :return: `True` or `False` to indicate whether the category was successfully assigned.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.assign_category_value')
+        version = 'v3'
+        spec_is_updated = False
+        add_categories = {}
+
+        if kind not in ['vm', 'host', 'cluster', ]:
+            raise ValueError('kind must be set to either "vm", "host" or "cluster" not "{0}".'.format(kind))
+
+        if self.api_client.connection_type == "pc":
+            try:
+                entity = self._get_spec(kind=kind, uuid=uuid)
+                logger.info('found entity: {0}'.format(entity))
+
+            except Exception as err:
+                logger.error(err)
+                raise
+
+            for item in categories:
+                logger.debug('item: {0}'.format(item))
+                category = item.get('category')
+                value = item.get('value')
+                if not category and value:
+                    raise ValueError('For each list item in categories you neeed to provide both category and value. For example {"category": "x", "value" :"y"}.')
+
+                if category:
+                    logger.debug('category: {0}'.format(category))
+
+                    if not self.search_category(name=category):
+                        logger.debug('Category "{0}" does not already exist - creating it.'.format(category))
+                        try:
+                            self.set_category(name=category)
+                            logger.info('Category "{0}" created.'.format(category))
+
+                        except Exception as err:
+                            raise RuntimeError('Category "{0}" creation failed. Error details: {1}'.format(category, err))
+                    else:
+                        logger.info('Category "{0}" exists.'.format(category))
+
+                else:
+                    raise ValueError('Each category/value pair should be defined in the format {"category": "x", "value": "y"}')
+
+                if value:
+                    value = item.get('value')
+                    logger.debug('category/value: {0}/{1}'.format(category, value))
+
+                    # If the category value does not exist create it
+                    if not self.search_category_value(category=category, value=value, refresh=True):
+                        logger.debug('Category "{0}" "{1}" does not already exist - creating it.'.format(category, value))
+                        try:
+                            self.set_category_value(category=category, value=value)
+                            logger.info('Category "{0}" value "{1}" created.'.format(category, value))
+
+                        except Exception as err:
+                            raise RuntimeError('Category "{0}" value "{1}" creation failed. Error details: {2}'.format(category, value, err))
+                    else:
+                        logger.info('Category "{0}" value "{1}" already exists.'.format(category, value))
+                else:
+                    raise ValueError('Each category/value pair should be defined in the format {"category": "x", "value": "y"}')
+
+                add_categories.update({category: value})
+
+            logger.debug("old entity['metadata']['categories']: {0}".format(entity['metadata']['categories']))
+            entity['metadata']['categories'].update(add_categories)
+            logger.debug("new entity['metadata']['categories']: {0}".format(entity['metadata']['categories']))
+
+            uri = '/{0}s/{1}'.format(kind, uuid)
+            params = {}
+            method = 'PUT'
+
+            try:
+                update = self.api_client.request(uri=uri, payload=entity, params=params, api_version=version, method=method)
+                logger.debug('update result: {0}'.format(update))
+
+                if wait:
+                    logger.info('waiting for task to complete')
+                    if update.get('status'):
+                        if update.get('status').get('state') == 'PENDING':
+                            task_uuid = update.get('status').get('execution_context').get('task_uuid')
+                            logger.info('task started: {0}'.format(task_uuid))
+
+                            if task_uuid:
+                                task_obj = Task(api_client=self.api_client)
+                                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task_uuid, max_refresh_secs=1))
+                                thread.start()
+                                task_obj.task_status.wait()
+                                if task_obj.task_result[task_uuid].get('status').lower() == 'succeeded':
+                                    logger.info('task succeeded: {0}'.format(task_uuid))
+                                    spec_is_updated = True
+                else:
+                    spec_is_updated = True
+
+            except Exception as err:
+                raise RuntimeError('Error fetching {0} {1}. Error details: {2}'.format(kind, uuid, err))
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return spec_is_updated
+
+    def unassign_category_value(self, categories:list, uuid:str, kind:str='vm', wait:bool=True):
+        """Unassign a list of categories & values from a VM, host or cluster.
+
+        :param categories: A list of of category/value key-pairs.
+
+            The dictionary format for each list item is as follows::
+                - category (str). The category to be assigned.
+                - value (str). The category value to be assigned.
+
+            Examples;
+                1. Add a single category/value - [{'category': 'AppFamily', 'value': 'Databases', }, ]
+                2. Add multiple categories/values - [{'category': 'AppFamily', 'value': 'Databases', }, {'category': 'Environment', 'value': 'Production', }, ]
+
+        :type categories: list
+        :param uuid: UUID of the object to be modified.
+        :type uuid: str
+        :param kind: The kind of object to be modified. (default='vm')
+        :type kind: str('vm', 'host', 'cluster'), optional
+        :param wait: Wait for the task to complete. (defaults=True)
+        :type wait: bool, optional
+
+        :return: `True` or `False` to indicate whether the category was successfully unassigned.
+        :rtype: bool
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Categories.unassign_category_value')
+        version = 'v3'
+        result = False
+
+        if kind not in ['vm', 'host', 'cluster', ]:
+            raise ValueError('kind must be set to either "vm", "host" or "cluster" not "{0}".'.format(kind))
+
+        if self.api_client.connection_type == "pc":
+            try:
+                entity = self._get_spec(kind=kind, uuid=uuid)
+                logger.debug('found entity: {0}'.format(entity))
+
+            except Exception as err:
+                logger.error(err)
+                raise
+
+            logger.info("old entity['metadata']['categories']: {0}".format(entity['metadata']['categories']))
+            for item in categories:
+                category = item.get('category')
+                value = item.get('value')
+                logger.debug("removing {0}/{1} from {2} {3}".format(category, value, kind, uuid))
+
+                if category and value:
+                    category_match = next(((k, v) for k, v in entity['metadata']['categories'].items() if k == category and v == value), None)
+                    if category_match:
+                        logger.debug("removing {0}/{1} from spec:".format(category, value))
+                        entity['metadata']['categories'].pop(category, None)
+
+                else:
+                    raise ValueError('Each category/value pair should be defined in the format {"category": "x", "value": "y"}')
+
+            logger.debug("new entity['metadata']['categories']: {0}".format(entity['metadata']['categories']))
+
+            uri = '/{0}s/{1}'.format(kind, uuid)
+            params = {}
+            method = 'PUT'
+
+            try:
+                update = self.api_client.request(uri=uri, payload=entity, params=params, api_version=version, method=method)
+                logger.debug('update result: {0}'.format(update))
+
+                if wait:
+                    logger.debug('waiting for task to complete')
+                    if update.get('status'):
+                        if update.get('status').get('state') == 'PENDING':
+                            task_uuid = update.get('status').get('execution_context').get('task_uuid')
+                            logger.debug('task started: {0}'.format(task_uuid))
+
+                            if task_uuid:
+                                task_obj = Task(api_client=self.api_client)
+                                thread = threading.Thread(target=task_obj.watch_task(task_uuid=task_uuid, max_refresh_secs=1))
+                                thread.start()
+                                task_obj.task_status.wait()
+                                if task_obj.task_result[task_uuid].get('status').lower() == 'succeeded':
+                                    logger.debug('task succeeded: {0}'.format(task_uuid))
+                                    result = True
+                else:
+                    result = True
+
+            except Exception as err:
+                raise RuntimeError('Error fetching {0} {1}. Error details: {2}'.format(kind, uuid, err))
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return result
+
+
+@versionadded(
+    reason="""Added Projects class.
+    """,
+    version='1.5.0',
+)
+class Projects(object):
+    """A class to represent Nutanix Prism Projects.
+
+    :param api_client: Initialized API client class
+    :type api_client: :class:`ntnx.client.ApiClient`
+    """
+
+    def __init__(self, api_client):
+        """
+        """
+        logger = logging.getLogger('ntnx_api.prism.Projects.__init__')
+        self.api_client = api_client
+        self.task_status = threading.Event()
+        self.task_result = {}
+        self.projects = {}
+        self.project_usage = {}
+
+        self.get(refresh=True)
+
+    def get(self, refresh=False):
+        """Retrieve data for all projects.
+
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A list of dictionaries describing all projects.
+        :rtype: ResponseList
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Projects.get')
+        params = {}
+        if not self.projects or refresh:
+            self.projects = {}
+
+            if self.api_client.connection_type == "pc":
+                uri = '/projects/list'
+                payload = {
+                    "kind": "project",
+                    "offset": 0,
+                    "length": 2147483647
+                }
+                self.projects = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
+            else:
+                logger.warning('Not connected to a Prism Central.')
+
+        return self.projects
+
+    def search(self, name, refresh=False):
+        """Search for a specific project.
+
+        :param name: Project name
+        :type name: str
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A dictionary describing the found project.
+        :rtype: ResponseDict
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Projects.search')
+        project = {}
+
+        if self.api_client.connection_type == "pc":
+            if not self.projects or refresh:
+                self.get(refresh=refresh)
+
+            project = next((item for item in self.projects if item["status"]["name"] == name), None)
+
+        else:
+            logger.warning('Not connected to a Prism Central.')
+
+        return project
+
+    def get_usage(self, name, refresh=False):
+        """Retrieve a list of the vms that belong to a specific project.
+
+        :param name: Project name
+        :type name: str
+        :param refresh: Whether to refresh an existing dataset if it exists.
+        :type refresh: str, optional
+
+        :returns: A list of dictionaries containing where the project is in use.
+
+            The per-item dictionary format is;
+                - name (str). The name of the VM found.
+                - uuid (str). The UUID of the VM found.
+                - kind (str). The kind of record found. As VMs are only returned by this function this will be 'vm'.
+
+        :rtype: ResponseList
+
+        .. note:: Will only return data when `connection_type=='pc'`
+        """
+        logger = logging.getLogger('ntnx_api.prism.Projects.get_usage')
+        params = {}
+
+        if self.api_client.connection_type == "pc":
+            logger.info('Connected to Prism Central')
+            if not self.project_usage.get(name) or refresh:
+                logger.info('Refreshing project usage data')
+                self.project_usage[name] = []
+
+                uri = '/vms/list'
+                payload = {
+                    "kind": "vm",
+                    "offset": 0,
+                    "length": 2147483647
+                }
+                vms = self.api_client.request(uri=uri, payload=payload, params=params).get('entities')
+
+                if vms:
+                    logger.info('Got VMs from v3 API')
+                    for vm in vms:
+                        logger.info('Processing VM: {0}'.format(vm))
+                        if vm.get('metadata'):
+                            logger.info('Found VM metadata')
+                            vm_project_kind = vm.get('metadata').get('project_reference').get('kind')
+                            vm_project_name = vm.get('metadata').get('project_reference').get('name')
+                            logger.info('vm_project_kind="{0}", vm_project_name="{1}"'.format(vm_project_kind, vm_project_name))
+
+                            if 'project_reference' in vm.get('metadata') and vm_project_kind == 'project' and vm_project_name == name:
+                                logger.info('Matched project {0}'.format(name))
+                                item = {
+                                    'kind': vm_project_kind,
+                                    'name': vm.get('status').get('name'),
+                                    'uuid': vm.get('metadata').get('uuid')
+                                }
+                                self.project_usage[name].append(item)
+                logger.info('Found VMs: {0}'.format(self.project_usage[name]))
+
+        return self.project_usage[name]
